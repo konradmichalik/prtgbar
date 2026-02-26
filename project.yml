@@ -1,0 +1,38 @@
+name: PRTGBar
+options:
+  bundleIdPrefix: com.konradmichalik
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: true
+targets:
+  PRTGBar:
+    type: application
+    platform: macOS
+    sources:
+      - PRTGBar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.konradmichalik.prtgbar
+        INFOPLIST_FILE: PRTGBar/Info.plist
+        CODE_SIGN_ENTITLEMENTS: PRTGBar/PRTGBar.entitlements
+        PRODUCT_NAME: PRTGBar
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme:
+      testTargets:
+        - PRTGBarTests
+  PRTGBarTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - PRTGBarTests
+    dependencies:
+      - target: PRTGBar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.konradmichalik.prtgbar.tests
