@@ -52,6 +52,9 @@ final class AppState: ObservableObject {
     // MARK: - Lifecycle
 
     func onLaunch() {
+        if notifyOnStatusChange {
+            requestNotificationPermission()
+        }
         startPolling()
     }
 
