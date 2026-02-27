@@ -165,6 +165,54 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
     }
 }
 
+// MARK: - Problem Item
+
+struct ProblemItem: Identifiable {
+    let id: Int
+    let sensorName: String
+    let status: SensorStatus
+    let message: String?
+    let deviceName: String
+    let groupName: String?
+
+    var breadcrumb: String {
+        if let groupName, !deviceName.isEmpty {
+            return "\(deviceName) › \(groupName)"
+        }
+        return deviceName.isEmpty ? (groupName ?? "") : deviceName
+    }
+
+    static func collect(from nodes: [TreeNode]) -> [ProblemItem] {
+        var items: [ProblemItem] = []
+        for node in nodes {
+            walk(node, ancestors: [], into: &items)
+        }
+        return items.sorted { $0.status.severity < $1.status.severity }
+    }
+
+    private static func walk(
+        _ node: TreeNode,
+        ancestors: [TreeNode],
+        into items: inout [ProblemItem]
+    ) {
+        if node.kind == .sensor, node.status != .up, node.status != .paused {
+            let device = ancestors.last { $0.kind == .device }
+            let group = ancestors.last { $0.kind == .group }
+            items.append(ProblemItem(
+                id: node.id,
+                sensorName: node.name,
+                status: node.status,
+                message: node.message,
+                deviceName: device?.name ?? "",
+                groupName: group?.name
+            ))
+        }
+        for child in node.children {
+            walk(child, ancestors: ancestors + [node], into: &items)
+        }
+    }
+}
+
 // MARK: - Tree Building
 
 enum TreeBuilder {

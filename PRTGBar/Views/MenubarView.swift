@@ -5,6 +5,7 @@ struct MenubarView: View {
 
     @Environment(\.openSettings) private var openSettings
     @State private var isRefreshing = false
+    @State private var showTree = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -104,8 +105,15 @@ struct MenubarView: View {
                 loadingView
             } else if appState.treeNodes.isEmpty {
                 noDataView
-            } else {
+            } else if showTree {
                 sensorTree
+            } else {
+                ProblemsView(
+                    treeNodes: appState.treeNodes,
+                    statusCounts: appState.statusCounts,
+                    serverURL: appState.serverURL,
+                    onShowAllSensors: { showTree = true }
+                )
             }
         }
         .frame(maxHeight: 450)
@@ -113,6 +121,19 @@ struct MenubarView: View {
 
     private var sensorTree: some View {
         List {
+            Button {
+                showTree = false
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left")
+                        .font(.caption2)
+                    Text("Problems")
+                        .font(.caption)
+                }
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+
             ForEach(appState.treeNodes) { node in
                 ObjectSection(
                     node: node,

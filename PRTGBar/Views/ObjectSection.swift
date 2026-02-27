@@ -247,7 +247,7 @@ private func sensorContextMenu(node: TreeNode, serverURL: String) -> some View {
     }
 }
 
-private func openInPrtg(objectId: Int, serverURL: String) {
+func openInPrtg(objectId: Int, serverURL: String) {
     let base = serverURL
         .trimmingCharacters(in: .whitespacesAndNewlines)
         .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
