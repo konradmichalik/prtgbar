@@ -142,7 +142,8 @@ struct MenubarView: View {
                 ProblemsView(
                     treeNodes: appState.treeNodes,
                     statusCounts: appState.statusCounts,
-                    serverURL: appState.serverURL
+                    serverURL: appState.serverURL,
+                    problemTimestamps: appState.problemTimestamps
                 )
             }
         }

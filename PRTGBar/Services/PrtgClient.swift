@@ -56,6 +56,7 @@ private struct V1Row: Decodable {
     let warnsensRaw: Int?
     let pausedsensRaw: Int?
     let unusualsensRaw: Int?
+    let lastdownRaw: Double?
 
     enum CodingKeys: String, CodingKey {
         case objid, name, parentid, tags
@@ -67,6 +68,32 @@ private struct V1Row: Decodable {
         case warnsensRaw = "warnsens_raw"
         case pausedsensRaw = "pausedsens_raw"
         case unusualsensRaw = "unusualsens_raw"
+        case lastdownRaw = "lastdown_raw"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        objid = try c.decode(Int.self, forKey: .objid)
+        name = try c.decode(String.self, forKey: .name)
+        statusRaw = try c.decodeIfPresent(Int.self, forKey: .statusRaw)
+        messageRaw = try c.decodeIfPresent(String.self, forKey: .messageRaw)
+        parentid = try c.decodeIfPresent(Int.self, forKey: .parentid)
+        tags = try c.decodeIfPresent(String.self, forKey: .tags)
+        activeRaw = try c.decodeIfPresent(Int.self, forKey: .activeRaw)
+        upsensRaw = try c.decodeIfPresent(Int.self, forKey: .upsensRaw)
+        downsensRaw = try c.decodeIfPresent(Int.self, forKey: .downsensRaw)
+        warnsensRaw = try c.decodeIfPresent(Int.self, forKey: .warnsensRaw)
+        pausedsensRaw = try c.decodeIfPresent(Int.self, forKey: .pausedsensRaw)
+        unusualsensRaw = try c.decodeIfPresent(Int.self, forKey: .unusualsensRaw)
+        // lastdown_raw is OLE Automation date — may be Double, String, or absent
+        if let val = try? c.decodeIfPresent(Double.self, forKey: .lastdownRaw) {
+            lastdownRaw = val
+        } else if let str = try? c.decodeIfPresent(String.self, forKey: .lastdownRaw),
+                  let val = Double(str) {
+            lastdownRaw = val
+        } else {
+            lastdownRaw = nil
+        }
     }
 }
 
@@ -136,7 +163,7 @@ enum PrtgClient {
         let columns: String
         switch kind {
         case .sensor:
-            columns = "objid,name,status,message,parentid,tags,active"
+            columns = "objid,name,status,message,parentid,tags,active,lastdown"
         default:
             columns = "objid,name,status,parentid,tags,active,upsens,downsens,warnsens,pausedsens,unusualsens"
         }
@@ -188,6 +215,17 @@ enum PrtgClient {
             nil
         }
 
+        // OLE Automation date → Swift Date (only for currently-down sensors)
+        let lastDown: Date? = if kind == .sensor,
+            let ole = row.lastdownRaw,
+            ole > 25569.0,
+            SensorStatus.problemStatuses.contains(status)
+        {
+            Date(timeIntervalSince1970: (ole - 25569.0) * 86400.0)
+        } else {
+            nil
+        }
+
         return PrtgObject(
             id: row.objid,
             name: row.name,
@@ -197,7 +235,8 @@ enum PrtgClient {
             parent: parent,
             tags: tags,
             active: active,
-            sensorStatusSummary: summary
+            sensorStatusSummary: summary,
+            lastDown: lastDown
         )
     }
 

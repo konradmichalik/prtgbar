@@ -62,6 +62,7 @@ final class AppState: ObservableObject {
 
     private var timerCancellable: AnyCancellable?
     private var previousSensorStates: [Int: SensorStatus] = [:]
+    private(set) var problemTimestamps: [Int: Date] = [:]
 
     func startPolling() {
         stopPolling()
@@ -96,13 +97,15 @@ final class AppState: ObservableObject {
 
             let tree = TreeBuilder.buildTree(from: objects)
 
-            if notifyOnStatusChange {
-                detectStatusChanges(objects: objects)
-            }
+            detectStatusChanges(objects: objects)
 
-            treeNodes = tree
-            lastUpdated = Date()
-            lastError = nil
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                treeNodes = tree
+                lastUpdated = Date()
+                lastError = nil
+            }
         } catch {
             lastError = error.localizedDescription
         }
@@ -130,18 +133,31 @@ final class AppState: ObservableObject {
     private func detectStatusChanges(objects: [PrtgObject]) {
         let sensors = objects.filter { $0.kind == .sensor }
         var newStates: [Int: SensorStatus] = [:]
+        var newTimestamps = problemTimestamps
 
         for sensor in sensors {
             guard let status = sensor.status else { continue }
             newStates[sensor.id] = status
 
-            if let previousStatus = previousSensorStates[sensor.id],
+            if SensorStatus.problemStatuses.contains(status) {
+                // Keep existing timestamp if already tracked, otherwise record now
+                if newTimestamps[sensor.id] == nil {
+                    newTimestamps[sensor.id] = Date()
+                }
+            } else {
+                // Sensor recovered — remove timestamp
+                newTimestamps.removeValue(forKey: sensor.id)
+            }
+
+            if notifyOnStatusChange,
+               let previousStatus = previousSensorStates[sensor.id],
                previousStatus != .down, status == .down {
                 sendNotification(sensorName: sensor.name, status: "down")
             }
         }
 
         previousSensorStates = newStates
+        problemTimestamps = newTimestamps
     }
 
     private nonisolated func sendNotification(sensorName: String, status: String) {
