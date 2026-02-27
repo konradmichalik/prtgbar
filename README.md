@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/images/prtg-logo-color.svg" alt="PRTGBar" width="80" height="80">
+  <img src="docs/images/prtg-logo-color.png" alt="PRTGBar" width="80" height="80">
 
 # PRTGBar
 
