@@ -169,7 +169,13 @@ private struct SensorRow: View {
             Spacer()
 
             if let message = node.message, !message.isEmpty {
-                Text(message)
+                let parsed = SensorMessage(message)
+                if parsed.isAcknowledged {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 7))
+                        .foregroundStyle(.green)
+                }
+                Text(parsed.text)
                     .font(.caption2.monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

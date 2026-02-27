@@ -1,5 +1,29 @@
 import SwiftUI
 
+// MARK: - Sensor Message Parsing
+
+struct SensorMessage {
+    let isAcknowledged: Bool
+    let text: String
+
+    init(_ raw: String) {
+        let prefixes = ["Bestätigt von ", "Acknowledged by "]
+        guard prefixes.contains(where: { raw.hasPrefix($0) }) else {
+            isAcknowledged = false
+            text = raw
+            return
+        }
+        isAcknowledged = true
+        if let range = raw.range(of: "]: ") {
+            text = String(raw[range.upperBound...])
+        } else if let range = raw.range(of: ": ", options: .backwards) {
+            text = String(raw[range.upperBound...])
+        } else {
+            text = raw
+        }
+    }
+}
+
 // MARK: - Sensor Status
 
 enum SensorStatus: String, Codable, CaseIterable {
