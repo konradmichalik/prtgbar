@@ -7,6 +7,10 @@ enum KeychainService {
     static func save(_ value: String, account: String) {
         guard let data = value.data(using: .utf8) else { return }
 
+        // Delete first so a fresh ACL is created with the current code signature.
+        // This prevents Keychain prompts after ad-hoc re-signing ("Sign to Run Locally").
+        delete(account: account)
+
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -14,17 +18,7 @@ enum KeychainService {
             kSecValueData: data
         ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
-
-        if status == errSecDuplicateItem {
-            let searchQuery: [CFString: Any] = [
-                kSecClass: kSecClassGenericPassword,
-                kSecAttrService: service,
-                kSecAttrAccount: account
-            ]
-            let update: [CFString: Any] = [kSecValueData: data]
-            SecItemUpdate(searchQuery as CFDictionary, update as CFDictionary)
-        }
+        SecItemAdd(query as CFDictionary, nil)
     }
 
     static func read(account: String) -> String? {
