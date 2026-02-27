@@ -59,6 +59,8 @@ enum SensorStatus: String, Codable, CaseIterable {
         }
     }
 
+    static let problemStatuses: Set<SensorStatus> = [.down, .partialdown, .warning, .unusual]
+
     var severity: Int {
         switch self {
         case .down: 0
@@ -111,9 +113,10 @@ struct PrtgObject: Codable, Identifiable, Equatable {
     let tags: [String]?
     let active: Bool?
     let sensorStatusSummary: StatusSummary?
+    let lastDown: Date?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, kind, status, message, parent, tags, active
+        case id, name, kind, status, message, parent, tags, active, lastDown
         case sensorStatusSummary = "sensor_status_summary"
     }
 }
@@ -144,6 +147,7 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
     let status: SensorStatus
     let message: String?
     let statusSummary: StatusSummary?
+    let lastDown: Date?
     var children: [TreeNode]
 
     var hasDownSensors: Bool {
@@ -173,6 +177,7 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
         status: SensorStatus,
         message: String? = nil,
         statusSummary: StatusSummary? = nil,
+        lastDown: Date? = nil,
         children: [TreeNode] = []
     ) {
         self.id = id
@@ -181,6 +186,7 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
         self.status = status
         self.message = message
         self.statusSummary = statusSummary
+        self.lastDown = lastDown
         self.children = children
     }
 
@@ -198,18 +204,19 @@ struct ProblemItem: Identifiable {
     let message: String?
     let deviceName: String
     let groupName: String?
+    let downSince: Date?
 
     var breadcrumb: String {
         if let groupName, !deviceName.isEmpty {
-            return "\(deviceName) › \(groupName)"
+            return "\(groupName) › \(deviceName)"
         }
         return deviceName.isEmpty ? (groupName ?? "") : deviceName
     }
 
-    static func collect(from nodes: [TreeNode]) -> [ProblemItem] {
+    static func collect(from nodes: [TreeNode], fallbackTimestamps: [Int: Date] = [:]) -> [ProblemItem] {
         var items: [ProblemItem] = []
         for node in nodes {
-            walk(node, ancestors: [], into: &items)
+            walk(node, ancestors: [], fallbackTimestamps: fallbackTimestamps, into: &items)
         }
         return items.sorted { $0.status.severity < $1.status.severity }
     }
@@ -217,6 +224,7 @@ struct ProblemItem: Identifiable {
     private static func walk(
         _ node: TreeNode,
         ancestors: [TreeNode],
+        fallbackTimestamps: [Int: Date],
         into items: inout [ProblemItem]
     ) {
         if node.kind == .sensor, node.status != .up, node.status != .paused {
@@ -228,11 +236,12 @@ struct ProblemItem: Identifiable {
                 status: node.status,
                 message: node.message,
                 deviceName: device?.name ?? "",
-                groupName: group?.name
+                groupName: group?.name,
+                downSince: node.lastDown ?? fallbackTimestamps[node.id]
             ))
         }
         for child in node.children {
-            walk(child, ancestors: ancestors + [node], into: &items)
+            walk(child, ancestors: ancestors + [node], fallbackTimestamps: fallbackTimestamps, into: &items)
         }
     }
 }
@@ -248,7 +257,8 @@ enum TreeBuilder {
                 kind: obj.kind,
                 status: obj.status ?? .unknown,
                 message: obj.message,
-                statusSummary: obj.sensorStatusSummary
+                statusSummary: obj.sensorStatusSummary,
+                lastDown: obj.lastDown
             )
         }
 
