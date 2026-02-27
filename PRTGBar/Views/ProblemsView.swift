@@ -4,7 +4,6 @@ struct ProblemsView: View {
     let treeNodes: [TreeNode]
     let statusCounts: StatusSummary
     let serverURL: String
-    let onShowAllSensors: () -> Void
 
     var body: some View {
         let problems = ProblemItem.collect(from: treeNodes)
@@ -29,8 +28,6 @@ struct ProblemsView: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
             Spacer()
-            showAllButton
-                .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, minHeight: 200)
     }
@@ -68,10 +65,6 @@ struct ProblemsView: View {
                     )
                 }
             }
-
-            Section {
-                showAllButton
-            }
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
@@ -91,18 +84,6 @@ struct ProblemsView: View {
         .foregroundStyle(color)
     }
 
-    private var showAllButton: some View {
-        Button(action: onShowAllSensors) {
-            HStack {
-                Text("Show all \(statusCounts.total) sensors")
-                    .font(.caption)
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-            }
-            .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.borderless)
-    }
 }
 
 // MARK: - Problem Row
@@ -126,7 +107,13 @@ private struct ProblemRow: View {
                 Spacer()
 
                 if let message = item.message, !message.isEmpty {
-                    Text(message)
+                    let parsed = SensorMessage(message)
+                    if parsed.isAcknowledged {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 7))
+                            .foregroundStyle(.green)
+                    }
+                    Text(parsed.text)
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

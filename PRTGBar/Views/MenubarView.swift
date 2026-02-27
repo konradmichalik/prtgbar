@@ -5,13 +5,19 @@ struct MenubarView: View {
 
     @Environment(\.openSettings) private var openSettings
     @State private var isRefreshing = false
-    @State private var showTree = false
+    @State private var selectedTab = ViewTab.problems
+
+    private enum ViewTab: String, CaseIterable {
+        case problems = "Problems"
+        case allSensors = "All Sensors"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             if appState.isConfigured && appState.treeNodes.isEmpty == false {
                 statusSummaryBar
+                tabPicker
             }
             Divider()
             content
@@ -84,6 +90,31 @@ struct MenubarView: View {
         .padding(.bottom, 6)
     }
 
+    private var tabPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(ViewTab.allCases, id: \.self) { tab in
+                Button {
+                    selectedTab = tab
+                } label: {
+                    Text(tab.rawValue)
+                        .font(.caption2)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .foregroundStyle(selectedTab == tab ? .primary : .tertiary)
+                        .background {
+                            if selectedTab == tab {
+                                Capsule().fill(.quaternary)
+                            }
+                        }
+                }
+                .buttonStyle(.borderless)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 6)
+    }
+
     private func statusPill(count: Int, status: SensorStatus) -> some View {
         HStack(spacing: 3) {
             Circle()
@@ -105,14 +136,13 @@ struct MenubarView: View {
                 loadingView
             } else if appState.treeNodes.isEmpty {
                 noDataView
-            } else if showTree {
+            } else if selectedTab == .allSensors {
                 sensorTree
             } else {
                 ProblemsView(
                     treeNodes: appState.treeNodes,
                     statusCounts: appState.statusCounts,
-                    serverURL: appState.serverURL,
-                    onShowAllSensors: { showTree = true }
+                    serverURL: appState.serverURL
                 )
             }
         }
@@ -121,19 +151,6 @@ struct MenubarView: View {
 
     private var sensorTree: some View {
         List {
-            Button {
-                showTree = false
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left")
-                        .font(.caption2)
-                    Text("Problems")
-                        .font(.caption)
-                }
-                .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.borderless)
-
             ForEach(appState.treeNodes) { node in
                 ObjectSection(
                     node: node,
