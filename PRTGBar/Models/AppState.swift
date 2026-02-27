@@ -49,6 +49,12 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Lifecycle
+
+    func onLaunch() {
+        startPolling()
+    }
+
     // MARK: - Polling
 
     private var timerCancellable: AnyCancellable?

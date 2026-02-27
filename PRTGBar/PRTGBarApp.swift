@@ -11,6 +11,7 @@ struct PRTGBarApp: App {
             MenubarView()
                 .environmentObject(appState)
                 .frame(width: 400, height: 520)
+                .task { appState.onLaunch() }
         } label: {
             Image("MenubarIcon")
             if let count = appState.badgeCount {
