@@ -55,7 +55,20 @@ final class AppState: ObservableObject {
         if notifyOnStatusChange {
             requestNotificationPermission()
         }
+        notificationIconURL = makeNotificationIconURL()
         startPolling()
+    }
+
+    private func makeNotificationIconURL() -> URL? {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("prtgbar-notif-icon.png")
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+        guard let image = NSImage(named: NSImage.applicationIconName),
+              let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]),
+              (try? png.write(to: url)) != nil else { return nil }
+        return url
     }
 
     // MARK: - Polling
@@ -63,6 +76,7 @@ final class AppState: ObservableObject {
     private var timerCancellable: AnyCancellable?
     private var previousSensorStates: [Int: SensorStatus] = [:]
     private(set) var problemTimestamps: [Int: Date] = [:]
+    private var notificationIconURL: URL?
 
     func startPolling() {
         stopPolling()
@@ -152,7 +166,7 @@ final class AppState: ObservableObject {
             if notifyOnStatusChange,
                let previousStatus = previousSensorStates[sensor.id],
                previousStatus != .down, status == .down {
-                sendNotification(sensorName: sensor.name, status: "down")
+                sendNotification(sensorName: sensor.name, status: "down", iconURL: notificationIconURL)
             }
         }
 
@@ -160,11 +174,15 @@ final class AppState: ObservableObject {
         problemTimestamps = newTimestamps
     }
 
-    private nonisolated func sendNotification(sensorName: String, status: String) {
+    private nonisolated func sendNotification(sensorName: String, status: String, iconURL: URL?) {
         let content = UNMutableNotificationContent()
         content.title = "Sensor Down"
         content.body = "\(sensorName) is now \(status)"
         content.sound = .default
+
+        if let iconURL {
+            content.attachments = (try? [UNNotificationAttachment(identifier: "icon", url: iconURL)]) ?? []
+        }
 
         let request = UNNotificationRequest(
             identifier: "sensor-\(sensorName)-\(Date().timeIntervalSince1970)",
