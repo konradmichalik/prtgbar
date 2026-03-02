@@ -134,7 +134,10 @@ enum PrtgClient {
         async let devices = fetchTable(serverURL: serverURL, token: token, content: "devices", kind: .device)
         async let sensors = fetchTable(serverURL: serverURL, token: token, content: "sensors", kind: .sensor)
 
-        return try await probes + groups + devices + sensors
+        // The PRTG Root group (parentid=0) is a system container above all probes.
+        // Its children appear as parentless roots, so Root itself shows up empty — exclude it.
+        let filteredGroups = try await groups.filter { $0.parent != nil }
+        return try await probes + filteredGroups + devices + sensors
     }
 
     // MARK: - Test Connection
