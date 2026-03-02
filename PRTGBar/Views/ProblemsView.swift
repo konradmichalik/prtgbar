@@ -41,14 +41,8 @@ struct ProblemsView: View {
                 Section {
                     ForEach(down) { item in
                         ProblemRow(item: item, serverURL: serverURL)
+                            .listRowSeparator(.hidden)
                     }
-                } header: {
-                    sectionHeader(
-                        count: down.count,
-                        label: "Down",
-                        icon: "xmark.circle.fill",
-                        color: .red
-                    )
                 }
             }
 
@@ -56,33 +50,14 @@ struct ProblemsView: View {
                 Section {
                     ForEach(warnings) { item in
                         ProblemRow(item: item, serverURL: serverURL)
+                            .listRowSeparator(.hidden)
                     }
-                } header: {
-                    sectionHeader(
-                        count: warnings.count,
-                        label: warnings.count == 1 ? "Warning" : "Warnings",
-                        icon: "exclamationmark.triangle.fill",
-                        color: .yellow
-                    )
                 }
             }
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
         .environment(\.defaultMinListRowHeight, 0)
-    }
-
-    // MARK: - Components
-
-    private func sectionHeader(
-        count: Int, label: String, icon: String, color: Color
-    ) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-            Text("\(count) \(label)")
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(color)
     }
 
 }

@@ -20,28 +20,31 @@ struct ObjectSection: View {
     }
 
     var body: some View {
-        switch node.kind {
-        case .probedevice:
-            ProbeSection(
-                node: node, serverURL: serverURL,
-                depth: depth, autoExpandErrors: autoExpandErrors,
-                isExpanded: $isExpanded
-            )
-        case .group:
-            GroupSection(
-                node: node, serverURL: serverURL,
-                depth: depth, autoExpandErrors: autoExpandErrors,
-                isExpanded: $isExpanded
-            )
-        case .device:
-            DeviceSection(
-                node: node, serverURL: serverURL,
-                depth: depth, autoExpandErrors: autoExpandErrors,
-                isExpanded: $isExpanded
-            )
-        case .sensor:
-            SensorRow(node: node, serverURL: serverURL)
+        Group {
+            switch node.kind {
+            case .probedevice:
+                ProbeSection(
+                    node: node, serverURL: serverURL,
+                    depth: depth, autoExpandErrors: autoExpandErrors,
+                    isExpanded: $isExpanded
+                )
+            case .group:
+                GroupSection(
+                    node: node, serverURL: serverURL,
+                    depth: depth, autoExpandErrors: autoExpandErrors,
+                    isExpanded: $isExpanded
+                )
+            case .device:
+                DeviceSection(
+                    node: node, serverURL: serverURL,
+                    depth: depth, autoExpandErrors: autoExpandErrors,
+                    isExpanded: $isExpanded
+                )
+            case .sensor:
+                SensorRow(node: node, serverURL: serverURL)
+            }
         }
+        .listRowSeparator(.hidden)
     }
 }
 
