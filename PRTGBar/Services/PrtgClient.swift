@@ -57,6 +57,7 @@ private struct V1Row: Decodable {
     let pausedsensRaw: Int?
     let unusualsensRaw: Int?
     let lastdownRaw: Double?
+    let downtimesinceRaw: Int?
 
     enum CodingKeys: String, CodingKey {
         case objid, name, parentid, tags
@@ -69,6 +70,7 @@ private struct V1Row: Decodable {
         case pausedsensRaw = "pausedsens_raw"
         case unusualsensRaw = "unusualsens_raw"
         case lastdownRaw = "lastdown_raw"
+        case downtimesinceRaw = "downtimesince_raw"
     }
 
     init(from decoder: Decoder) throws {
@@ -85,6 +87,15 @@ private struct V1Row: Decodable {
         warnsensRaw = try c.decodeIfPresent(Int.self, forKey: .warnsensRaw)
         pausedsensRaw = try c.decodeIfPresent(Int.self, forKey: .pausedsensRaw)
         unusualsensRaw = try c.decodeIfPresent(Int.self, forKey: .unusualsensRaw)
+        // downtimesince_raw may be Int, String, or absent depending on sensor state
+        if let val = try? c.decodeIfPresent(Int.self, forKey: .downtimesinceRaw) {
+            downtimesinceRaw = val
+        } else if let str = try? c.decodeIfPresent(String.self, forKey: .downtimesinceRaw),
+                  let val = Int(str) {
+            downtimesinceRaw = val
+        } else {
+            downtimesinceRaw = nil
+        }
         // lastdown_raw is OLE Automation date — may be Double, String, or absent
         if let val = try? c.decodeIfPresent(Double.self, forKey: .lastdownRaw) {
             lastdownRaw = val
@@ -166,7 +177,7 @@ enum PrtgClient {
         let columns: String
         switch kind {
         case .sensor:
-            columns = "objid,name,status,message,parentid,tags,active,lastdown"
+            columns = "objid,name,status,message,parentid,tags,active,lastdown,downtimesince"
         default:
             columns = "objid,name,status,parentid,tags,active,upsens,downsens,warnsens,pausedsens,unusualsens"
         }
@@ -218,15 +229,19 @@ enum PrtgClient {
             nil
         }
 
-        // OLE Automation date → Swift Date (only for currently-down sensors)
-        let lastDown: Date? = if kind == .sensor,
-            let ole = row.lastdownRaw,
-            ole > 25569.0,
-            SensorStatus.problemStatuses.contains(status)
-        {
-            Date(timeIntervalSince1970: (ole - 25569.0) * 86400.0)
+        // Prefer downtimesince_raw (seconds) from PRTG — most accurate.
+        // Fall back to lastdown_raw (OLE Automation date) if unavailable.
+        let lastDown: Date?
+        if kind == .sensor, SensorStatus.problemStatuses.contains(status) {
+            if let seconds = row.downtimesinceRaw, seconds > 0 {
+                lastDown = Date(timeIntervalSinceNow: -Double(seconds))
+            } else if let ole = row.lastdownRaw, ole > 25569.0 {
+                lastDown = Date(timeIntervalSince1970: (ole - 25569.0) * 86400.0)
+            } else {
+                lastDown = nil
+            }
         } else {
-            nil
+            lastDown = nil
         }
 
         return PrtgObject(
