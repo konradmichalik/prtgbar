@@ -218,7 +218,14 @@ struct ProblemItem: Identifiable {
         for node in nodes {
             walk(node, ancestors: [], fallbackTimestamps: fallbackTimestamps, into: &items)
         }
-        return items.sorted { $0.status.severity < $1.status.severity }
+        return items.sorted { a, b in
+            switch (a.downSince, b.downSince) {
+            case (let da?, let db?): return da > db  // more recent start = newest problem first
+            case (_?, nil):          return true      // known duration before unknown
+            case (nil, _?):          return false
+            case (nil, nil):         return a.status.severity < b.status.severity
+            }
+        }
     }
 
     private static func walk(
