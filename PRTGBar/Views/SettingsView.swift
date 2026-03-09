@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
+    @State private var selectedTab: SettingsTab = .general
 
     @State private var serverURL = ""
     @State private var apiKey = ""
@@ -12,18 +13,52 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        Form {
-            serverSection
-            refreshSection
-            displaySection
-            notificationSection
+        VStack(spacing: 0) {
+            Picker("", selection: $selectedTab) {
+                ForEach(SettingsTab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 60)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+
+            Group {
+                switch selectedTab {
+                case .general:
+                    generalTab
+                case .about:
+                    AboutView()
+                }
+            }
+            .frame(height: selectedTab == .general ? 280 : 300)
         }
-        .formStyle(.grouped)
-        .frame(width: 400, height: 340)
+        .frame(width: 400)
         .onAppear {
             serverURL = appState.serverURL
             apiKey = appState.apiKey
+            // Ensure settings window appears above all other windows (LSUIElement app)
+            DispatchQueue.main.async {
+                for window in NSApp.windows where window.title == "Settings" || window.identifier?.rawValue.contains("settings") == true {
+                    window.level = .floating
+                    window.orderFrontRegardless()
+                }
+            }
         }
+    }
+
+    // MARK: - General
+
+    private var generalTab: some View {
+        Form {
+            serverSection
+            refreshSection
+            notificationSection
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
     }
 
     // MARK: - Server
@@ -91,14 +126,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Display
-
-    private var displaySection: some View {
-        Section("Display") {
-            Toggle("Auto-expand groups with errors", isOn: $appState.autoExpandErrors)
-        }
-    }
-
     // MARK: - Notifications
 
     private var notificationSection: some View {
@@ -122,6 +149,20 @@ struct SettingsView: View {
             if success {
                 appState.startPolling()
             }
+        }
+    }
+}
+
+private enum SettingsTab: String, CaseIterable, Identifiable {
+    case general
+    case about
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .about: "About"
         }
     }
 }
