@@ -5,19 +5,13 @@ struct MenubarView: View {
 
     @Environment(\.openSettings) private var openSettings
     @State private var isRefreshing = false
-    @State private var selectedTab = ViewTab.problems
-
-    private enum ViewTab: String, CaseIterable {
-        case problems = "Problems"
-        case allSensors = "All Sensors"
-    }
+    @AppStorage("groupByDevice") private var groupByDevice = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
             if appState.isConfigured && appState.treeNodes.isEmpty == false {
                 statusSummaryBar
-                tabPicker
             }
             Divider()
             content
@@ -43,31 +37,22 @@ struct MenubarView: View {
             }
 
             Button {
-                withAnimation { isRefreshing = true }
-                Task {
-                    await appState.refresh()
-                    withAnimation { isRefreshing = false }
-                }
+                groupByDevice.toggle()
             } label: {
-                Image(systemName: "arrow.clockwise")
-                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
-                    .animation(
-                        isRefreshing
-                            ? .linear(duration: 0.8).repeatForever(autoreverses: false)
-                            : .default,
-                        value: isRefreshing
-                    )
+                Image(systemName: groupByDevice ? "list.bullet" : "list.bullet.indent")
             }
             .buttonStyle(.borderless)
-            .disabled(appState.isLoading)
+            .help(groupByDevice ? "Flat list" : "Group by device")
 
-            Button {
-                NSApp.activate(ignoringOtherApps: true)
-                openSettings()
-            } label: {
-                Image(systemName: "gearshape")
+            if !appState.serverURL.isEmpty {
+                Button {
+                    openPrtgDashboard(serverURL: appState.serverURL)
+                } label: {
+                    Image(systemName: "globe")
+                }
+                .buttonStyle(.borderless)
+                .help("Open PRTG")
             }
-            .buttonStyle(.borderless)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -83,31 +68,6 @@ struct MenubarView: View {
             statusPill(count: counts.warning, status: .warning)
             if counts.paused > 0 {
                 statusPill(count: counts.paused, status: .paused)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 14)
-        .padding(.bottom, 6)
-    }
-
-    private var tabPicker: some View {
-        HStack(spacing: 2) {
-            ForEach(ViewTab.allCases, id: \.self) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    Text(tab.rawValue)
-                        .font(.caption2)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .foregroundStyle(selectedTab == tab ? .primary : .tertiary)
-                        .background {
-                            if selectedTab == tab {
-                                Capsule().fill(.quaternary)
-                            }
-                        }
-                }
-                .buttonStyle(.borderless)
             }
             Spacer()
         }
@@ -136,35 +96,17 @@ struct MenubarView: View {
                 loadingView
             } else if appState.treeNodes.isEmpty {
                 noDataView
-            } else if selectedTab == .allSensors {
-                sensorTree
             } else {
                 ProblemsView(
                     treeNodes: appState.treeNodes,
                     statusCounts: appState.statusCounts,
                     serverURL: appState.serverURL,
-                    problemTimestamps: appState.problemTimestamps
+                    problemTimestamps: appState.problemTimestamps,
+                    groupByDevice: groupByDevice
                 )
             }
         }
         .frame(maxHeight: 450)
-    }
-
-    private var sensorTree: some View {
-        List {
-            ForEach(appState.treeNodes) { node in
-                ObjectSection(
-                    node: node,
-                    serverURL: appState.serverURL,
-                    depth: 0,
-                    autoExpandErrors: appState.autoExpandErrors
-                )
-            }
-        }
-        .listStyle(.inset)
-        .scrollContentBackground(.hidden)
-        .environment(\.defaultMinListRowHeight, 0)
-        .listRowSeparator(.hidden)
     }
 
     private var loadingView: some View {
@@ -218,11 +160,45 @@ struct MenubarView: View {
     private var footer: some View {
         HStack {
             if let updated = appState.lastUpdated {
-                Text("Updated \(updated, style: .time)")
+                Text(relativeTimeString(from: updated))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
+
+            Button {
+                withAnimation { isRefreshing = true }
+                Task {
+                    await appState.refresh()
+                    withAnimation { isRefreshing = false }
+                }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.caption)
+                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                    .animation(
+                        isRefreshing
+                            ? .linear(duration: 0.8).repeatForever(autoreverses: false)
+                            : .default,
+                        value: isRefreshing
+                    )
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .disabled(appState.isLoading)
+
             Spacer()
+
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Settings")
+
             Button {
                 NSApp.terminate(nil)
             } label: {
@@ -235,5 +211,16 @@ struct MenubarView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+    }
+
+    private func relativeTimeString(from date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        if seconds < 60 { return "Updated just now" }
+        let minutes = seconds / 60
+        if minutes == 1 { return "Updated 1 min ago" }
+        if minutes < 60 { return "Updated \(minutes) min ago" }
+        let hours = minutes / 60
+        if hours == 1 { return "Updated 1 hour ago" }
+        return "Updated \(hours) hours ago"
     }
 }

@@ -32,7 +32,6 @@ final class AppState: ObservableObject {
 
     @AppStorage("serverURL") var serverURL = ""
     @AppStorage("refreshInterval") var refreshInterval: Double = 60
-    @AppStorage("autoExpandErrors") var autoExpandErrors = true
     @AppStorage("notifyOnStatusChange") var notifyOnStatusChange = true
 
     // MARK: - API Key (Keychain)

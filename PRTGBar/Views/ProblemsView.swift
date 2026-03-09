@@ -5,15 +5,18 @@ struct ProblemsView: View {
     let statusCounts: StatusSummary
     let serverURL: String
     let problemTimestamps: [Int: Date]
+    let groupByDevice: Bool
 
     var body: some View {
         let problems = ProblemItem.collect(from: treeNodes, fallbackTimestamps: problemTimestamps)
         if problems.isEmpty {
             allGoodView
+        } else if groupByDevice {
+            groupedList(problems: problems)
         } else {
             let down = problems.filter { $0.status == .down || $0.status == .partialdown }
             let warnings = problems.filter { $0.status != .down && $0.status != .partialdown }
-            problemsList(down: down, warnings: warnings)
+            flatList(down: down, warnings: warnings)
         }
     }
 
@@ -33,31 +36,61 @@ struct ProblemsView: View {
         .frame(maxWidth: .infinity, minHeight: 200)
     }
 
-    // MARK: - Problems List
+    // MARK: - Flat List
 
-    private func problemsList(down: [ProblemItem], warnings: [ProblemItem]) -> some View {
-        List {
-            if !down.isEmpty {
-                Section {
+    private func flatList(down: [ProblemItem], warnings: [ProblemItem]) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                if !down.isEmpty {
+                    sectionHeader("Errors")
                     ForEach(down) { item in
                         ProblemRow(item: item, serverURL: serverURL)
-                            .listRowSeparator(.hidden)
                     }
                 }
-            }
 
-            if !warnings.isEmpty {
-                Section {
+                if !warnings.isEmpty {
+                    sectionHeader("Warnings")
                     ForEach(warnings) { item in
                         ProblemRow(item: item, serverURL: serverURL)
-                            .listRowSeparator(.hidden)
                     }
                 }
             }
+            .padding(.horizontal, 14)
         }
-        .listStyle(.inset)
-        .scrollContentBackground(.hidden)
-        .environment(\.defaultMinListRowHeight, 0)
+        .scrollIndicators(.never)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.top, 8)
+            .padding(.bottom, 2)
+    }
+
+    // MARK: - Grouped List
+
+    private func groupedList(problems: [ProblemItem]) -> some View {
+        let groups = Dictionary(grouping: problems) { $0.breadcrumb.isEmpty ? $0.deviceName : $0.breadcrumb }
+        let sortedKeys = groups.keys.sorted { a, b in
+            let aWorst = groups[a]!.map(\.status.severity).min() ?? Int.max
+            let bWorst = groups[b]!.map(\.status.severity).min() ?? Int.max
+            if aWorst != bWorst { return aWorst < bWorst }
+            return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
+        }
+
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(sortedKeys, id: \.self) { key in
+                    sectionHeader(key.isEmpty ? "Unknown" : key)
+                    ForEach(groups[key]!) { item in
+                        ProblemRow(item: item, serverURL: serverURL, showBreadcrumb: false)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+        }
+        .scrollIndicators(.never)
     }
 
 }
@@ -67,6 +100,7 @@ struct ProblemsView: View {
 private struct ProblemRow: View {
     let item: ProblemItem
     let serverURL: String
+    var showBreadcrumb: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -93,11 +127,12 @@ private struct ProblemRow: View {
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .help(parsed.text)
                 }
             }
 
             HStack(spacing: 0) {
-                if !item.breadcrumb.isEmpty {
+                if showBreadcrumb, !item.breadcrumb.isEmpty {
                     Text(item.breadcrumb)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
@@ -201,4 +236,33 @@ private func formatDuration(_ seconds: TimeInterval) -> String {
     if days < 1 { return "\(hours)h \(minutes % 60)m" }
     if days < 7 { return "\(days)d \(hours % 24)h" }
     return "\(days)d"
+}
+
+// MARK: - Open in PRTG
+
+func openPrtgDashboard(serverURL: String) {
+    let base = serverURL
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+    guard var components = URLComponents(string: base) else { return }
+    components.port = nil
+    components.path = "/"
+    guard let url = components.url else { return }
+    NSWorkspace.shared.open(url)
+}
+
+func openInPrtg(objectId: Int, serverURL: String) {
+    let base = serverURL
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+    guard var components = URLComponents(string: base) else { return }
+    // Web UI runs on default port (443), not the API port
+    components.port = nil
+    components.path = "/sensor.htm"
+    components.queryItems = [URLQueryItem(name: "id", value: "\(objectId)")]
+
+    guard let url = components.url else { return }
+    NSWorkspace.shared.open(url)
 }
