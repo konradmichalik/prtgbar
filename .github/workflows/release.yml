@@ -14,9 +14,9 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            rust_target: aarch64-apple-darwin
+            target: aarch64-apple-darwin
           - arch: x86_64
-            rust_target: x86_64-apple-darwin
+            target: x86_64-apple-darwin
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
       - name: Create DMG
         run: |
           APP_PATH="build/Build/Products/Release/PRTGBar.app"
-          DMG_NAME="PRTGBar-${{ matrix.rust_target }}.dmg"
+          DMG_NAME="PRTGBar-${{ matrix.target }}.dmg"
 
           mkdir -p dmg-staging
           cp -R "$APP_PATH" dmg-staging/
@@ -84,6 +84,14 @@ jobs:
             dmg-x86_64/*.dmg
             checksums.txt
 
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
       - name: Extract checksums
         id: checksums
         run: |
@@ -101,7 +109,8 @@ jobs:
           client-payload: |
             {
               "app": "prtgbar",
-              "version": "${{ github.ref_name }}",
-              "arm64_sha": "${{ steps.checksums.outputs.arm64_sha }}",
-              "x86_sha": "${{ steps.checksums.outputs.x86_sha }}"
+              "version": "${{ steps.version.outputs.version }}",
+              "tag": "${{ steps.version.outputs.tag }}",
+              "sha_arm": "${{ steps.checksums.outputs.arm64_sha }}",
+              "sha_intel": "${{ steps.checksums.outputs.x86_sha }}"
             }
