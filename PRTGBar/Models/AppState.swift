@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import UserNotifications
+import AppKit
 
 @MainActor
 final class AppState: ObservableObject {
@@ -14,6 +15,7 @@ final class AppState: ObservableObject {
     @Published var isConfigured = false
 
     var badgeCount: Int? {
+        guard showBadgeCount else { return nil }
         let count = treeNodes.reduce(0) { total, node in
             total + countDown(node)
         }
@@ -21,11 +23,9 @@ final class AppState: ObservableObject {
     }
 
     var statusCounts: StatusSummary {
-        var up = 0, down = 0, warning = 0, paused = 0, unknown = 0
-        for node in treeNodes {
-            accumulateCounts(node, up: &up, down: &down, warning: &warning, paused: &paused, unknown: &unknown)
+        treeNodes.reduce(into: StatusSummary.empty) { result, node in
+            result += countSensors(node)
         }
-        return StatusSummary(up: up, down: down, warning: warning, paused: paused, unknown: unknown)
     }
 
     // MARK: - Settings (persisted)
@@ -33,6 +33,11 @@ final class AppState: ObservableObject {
     @AppStorage("serverURL") var serverURL = ""
     @AppStorage("refreshInterval") var refreshInterval: Double = 60
     @AppStorage("notifyOnStatusChange") var notifyOnStatusChange = true
+    @AppStorage("notificationSound") var notificationSound = true
+    @AppStorage("notifyOnDown") var notifyOnDown = true
+    @AppStorage("notifyOnWarning") var notifyOnWarning = false
+    @AppStorage("showBadgeCount") var showBadgeCount = true
+    @AppStorage("acceptSelfSignedCerts") var acceptSelfSignedCerts = true
 
     // MARK: - API Key (Keychain)
 
@@ -51,23 +56,21 @@ final class AppState: ObservableObject {
     // MARK: - Lifecycle
 
     func onLaunch() {
+        if DemoData.isEnabled {
+            loadDemoData()
+            return
+        }
         if notifyOnStatusChange {
             requestNotificationPermission()
         }
-        notificationIconURL = makeNotificationIconURL()
         startPolling()
     }
 
-    private func makeNotificationIconURL() -> URL? {
-        let url = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("prtgbar-notif-icon.png")
-        if FileManager.default.fileExists(atPath: url.path) { return url }
-        guard let image = NSImage(named: NSImage.applicationIconName),
-              let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff),
-              let png = rep.representation(using: .png, properties: [:]),
-              (try? png.write(to: url)) != nil else { return nil }
-        return url
+    private func loadDemoData() {
+        treeNodes = DemoData.buildTree()
+        problemTimestamps = DemoData.problemTimestamps
+        lastUpdated = Date()
+        isConfigured = true
     }
 
     // MARK: - Polling
@@ -75,7 +78,6 @@ final class AppState: ObservableObject {
     private var timerCancellable: AnyCancellable?
     private var previousSensorStates: [Int: SensorStatus] = [:]
     private(set) var problemTimestamps: [Int: Date] = [:]
-    private var notificationIconURL: URL?
 
     func startPolling() {
         stopPolling()
@@ -104,8 +106,10 @@ final class AppState: ObservableObject {
         lastError = nil
 
         do {
-            let objects = try await Task.detached { [serverURL, apiKey] in
-                try await PrtgClient.fetchObjects(serverURL: serverURL, token: apiKey)
+            let objects = try await Task.detached { [serverURL, apiKey, acceptSelfSignedCerts] in
+                try await PrtgClient.fetchObjects(
+                    serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
+                )
             }.value
 
             let tree = TreeBuilder.buildTree(from: objects)
@@ -128,8 +132,10 @@ final class AppState: ObservableObject {
 
     func testConnection() async -> Bool {
         do {
-            return try await Task.detached { [serverURL, apiKey] in
-                try await PrtgClient.testConnection(serverURL: serverURL, token: apiKey)
+            return try await Task.detached { [serverURL, apiKey, acceptSelfSignedCerts] in
+                try await PrtgClient.testConnection(
+                    serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
+                )
             }.value
         } catch {
             lastError = error.localizedDescription
@@ -153,19 +159,29 @@ final class AppState: ObservableObject {
             newStates[sensor.id] = status
 
             if SensorStatus.problemStatuses.contains(status) {
-                // Keep existing timestamp if already tracked, otherwise record now
                 if newTimestamps[sensor.id] == nil {
                     newTimestamps[sensor.id] = Date()
                 }
             } else {
-                // Sensor recovered — remove timestamp
                 newTimestamps.removeValue(forKey: sensor.id)
             }
 
-            if notifyOnStatusChange,
-               let previousStatus = previousSensorStates[sensor.id],
-               previousStatus != .down, status == .down {
-                sendNotification(sensorName: sensor.name, status: "down", iconURL: notificationIconURL)
+            guard notifyOnStatusChange,
+                  let previousStatus = previousSensorStates[sensor.id],
+                  previousStatus != status else { continue }
+
+            let shouldNotify: Bool
+            switch status {
+            case .down, .partialdown:
+                shouldNotify = notifyOnDown
+            case .warning, .unusual:
+                shouldNotify = notifyOnWarning
+            default:
+                shouldNotify = false
+            }
+
+            if shouldNotify {
+                sendNotification(sensorName: sensor.name, sensorStatus: status, playSound: notificationSound)
             }
         }
 
@@ -173,14 +189,16 @@ final class AppState: ObservableObject {
         problemTimestamps = newTimestamps
     }
 
-    private nonisolated func sendNotification(sensorName: String, status: String, iconURL: URL?) {
+    nonisolated private func sendNotification(sensorName: String, sensorStatus: SensorStatus, playSound: Bool) {
         let content = UNMutableNotificationContent()
-        content.title = "Sensor Down"
-        content.body = "\(sensorName) is now \(status)"
-        content.sound = .default
+        content.title = "Sensor \(sensorStatus.notificationLabel)"
+        content.body = sensorName
+        if playSound {
+            content.sound = .default
+        }
 
-        if let iconURL {
-            content.attachments = (try? [UNNotificationAttachment(identifier: "icon", url: iconURL)]) ?? []
+        if let iconURL = makeStatusIconURL(for: sensorStatus) {
+            content.attachments = (try? [UNNotificationAttachment(identifier: "status-icon", url: iconURL)]) ?? []
         }
 
         let request = UNNotificationRequest(
@@ -192,6 +210,34 @@ final class AppState: ObservableObject {
         UNUserNotificationCenter.current().add(request)
     }
 
+    nonisolated private func makeStatusIconURL(for status: SensorStatus) -> URL? {
+        let fileName = "prtgbar-notif-\(status.rawValue).png"
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+
+        let size: CGFloat = 64
+        let symbolName = status.notificationSymbol
+        let nsColor = NSColor(status.color)
+
+        guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) else { return nil }
+
+        let config = NSImage.SymbolConfiguration(pointSize: size * 0.7, weight: .regular)
+        let configured = symbol.withSymbolConfiguration(config) ?? symbol
+
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            nsColor.setFill()
+            configured.draw(in: rect)
+            return true
+        }
+
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]),
+              (try? png.write(to: url)) != nil else { return nil }
+
+        return url
+    }
+
     // MARK: - Helpers
 
     private func countDown(_ node: TreeNode) -> Int {
@@ -199,21 +245,19 @@ final class AppState: ObservableObject {
         return node.children.reduce(0) { $0 + countDown($1) }
     }
 
-    private func accumulateCounts(
-        _ node: TreeNode,
-        up: inout Int, down: inout Int, warning: inout Int, paused: inout Int, unknown: inout Int
-    ) {
+    private func countSensors(_ node: TreeNode) -> StatusSummary {
+        var result = StatusSummary.empty
         if node.kind == .sensor {
             switch node.status {
-            case .up: up += 1
-            case .down: down += 1
-            case .warning: warning += 1
-            case .paused: paused += 1
-            default: unknown += 1
+            case .up: result = StatusSummary(up: 1, down: 0, warning: 0, paused: 0, unknown: 0)
+            case .down: result = StatusSummary(up: 0, down: 1, warning: 0, paused: 0, unknown: 0)
+            case .warning: result = StatusSummary(up: 0, down: 0, warning: 1, paused: 0, unknown: 0)
+            case .paused: result = StatusSummary(up: 0, down: 0, warning: 0, paused: 1, unknown: 0)
+            default: result = StatusSummary(up: 0, down: 0, warning: 0, paused: 0, unknown: 1)
             }
         }
-        for child in node.children {
-            accumulateCounts(child, up: &up, down: &down, warning: &warning, paused: &paused, unknown: &unknown)
+        return node.children.reduce(into: result) { acc, child in
+            acc += countSensors(child)
         }
     }
 }

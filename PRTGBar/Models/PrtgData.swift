@@ -61,6 +61,24 @@ enum SensorStatus: String, Codable, CaseIterable {
 
     static let problemStatuses: Set<SensorStatus> = [.down, .partialdown, .warning, .unusual]
 
+    var notificationSymbol: String {
+        switch self {
+        case .down, .partialdown: "exclamationmark.circle.fill"
+        case .warning, .unusual: "exclamationmark.triangle.fill"
+        default: symbolName
+        }
+    }
+
+    var notificationLabel: String {
+        switch self {
+        case .down: "Down"
+        case .partialdown: "Partial Down"
+        case .warning: "Warning"
+        case .unusual: "Unusual"
+        default: rawValue.capitalized
+        }
+    }
+
     var severity: Int {
         switch self {
         case .down: 0
@@ -86,6 +104,20 @@ struct StatusSummary: Codable, Equatable {
     var total: Int { up + down + warning + paused + unknown }
 
     static let empty = StatusSummary(up: 0, down: 0, warning: 0, paused: 0, unknown: 0)
+
+    static func + (lhs: StatusSummary, rhs: StatusSummary) -> StatusSummary {
+        StatusSummary(
+            up: lhs.up + rhs.up,
+            down: lhs.down + rhs.down,
+            warning: lhs.warning + rhs.warning,
+            paused: lhs.paused + rhs.paused,
+            unknown: lhs.unknown + rhs.unknown
+        )
+    }
+
+    static func += (lhs: inout StatusSummary, rhs: StatusSummary) {
+        lhs = lhs + rhs
+    }
 }
 
 // MARK: - PRTG Object (API Response)

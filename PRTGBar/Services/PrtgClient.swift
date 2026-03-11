@@ -128,32 +128,52 @@ private final class SelfSignedDelegate: NSObject, URLSessionDelegate, Sendable {
 // MARK: - Client
 
 enum PrtgClient {
-    private static let delegate = SelfSignedDelegate()
+    private static let selfSignedDelegate = SelfSignedDelegate()
 
-    private static let session: URLSession = {
+    private static let selfSignedSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
-        return URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        return URLSession(configuration: config, delegate: selfSignedDelegate, delegateQueue: nil)
     }()
+
+    private static let strictSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        return URLSession(configuration: config)
+    }()
+
+    private static func session(acceptSelfSigned: Bool) -> URLSession {
+        acceptSelfSigned ? selfSignedSession : strictSession
+    }
 
     // MARK: - Fetch Objects
 
-    static func fetchObjects(serverURL: String, token: String) async throws -> [PrtgObject] {
-        async let probes = fetchTable(serverURL: serverURL, token: token, content: "probenode", kind: .probedevice)
-        async let groups = fetchTable(serverURL: serverURL, token: token, content: "groups", kind: .group)
-        async let devices = fetchTable(serverURL: serverURL, token: token, content: "devices", kind: .device)
-        async let sensors = fetchTable(serverURL: serverURL, token: token, content: "sensors", kind: .sensor)
+    static func fetchObjects(
+        serverURL: String, token: String, acceptSelfSignedCerts: Bool = true
+    ) async throws -> [PrtgObject] {
+        let ssl = acceptSelfSignedCerts
+        async let probes = fetchTable(
+            serverURL: serverURL, token: token, content: "probenode", kind: .probedevice, acceptSelfSignedCerts: ssl
+        )
+        async let groups = fetchTable(
+            serverURL: serverURL, token: token, content: "groups", kind: .group, acceptSelfSignedCerts: ssl
+        )
+        async let devices = fetchTable(
+            serverURL: serverURL, token: token, content: "devices", kind: .device, acceptSelfSignedCerts: ssl
+        )
+        async let sensors = fetchTable(
+            serverURL: serverURL, token: token, content: "sensors", kind: .sensor, acceptSelfSignedCerts: ssl
+        )
 
-        // The PRTG Root group (parentid=0) is a system container above all probes.
-        // Its children appear as parentless roots, so Root itself shows up empty — exclude it.
         let filteredGroups = try await groups.filter { $0.parent != nil }
         return try await probes + filteredGroups + devices + sensors
     }
 
     // MARK: - Test Connection
 
-    static func testConnection(serverURL: String, token: String) async throws -> Bool {
+    static func testConnection(serverURL: String, token: String, acceptSelfSignedCerts: Bool = true) async throws -> Bool {
         let url = try buildURL(
             serverURL: serverURL,
             path: "/api/table.json",
@@ -165,14 +185,14 @@ enum PrtgClient {
             ]
         )
 
-        _ = try await performRequest(url: url, token: token)
+        _ = try await performRequest(url: url, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts)
         return true
     }
 
     // MARK: - V1 Table Fetch
 
     private static func fetchTable(
-        serverURL: String, token: String, content: String, kind: ObjectKind
+        serverURL: String, token: String, content: String, kind: ObjectKind, acceptSelfSignedCerts: Bool = true
     ) async throws -> [PrtgObject] {
         let columns: String
         switch kind {
@@ -193,7 +213,7 @@ enum PrtgClient {
             ]
         )
 
-        let data = try await performRequest(url: url, token: token)
+        let data = try await performRequest(url: url, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts)
 
         do {
             let response = try JSONDecoder().decode(V1TableResponse.self, from: data)
@@ -305,7 +325,7 @@ enum PrtgClient {
 
     // MARK: - Request
 
-    private static func performRequest(url: URL, token: String) async throws -> Data {
+    private static func performRequest(url: URL, token: String, acceptSelfSignedCerts: Bool = true) async throws -> Data {
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -313,7 +333,7 @@ enum PrtgClient {
         let response: URLResponse
 
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await session(acceptSelfSigned: acceptSelfSignedCerts).data(for: request)
         } catch {
             throw PrtgClientError.networkError(error)
         }

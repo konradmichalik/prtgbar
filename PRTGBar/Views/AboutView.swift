@@ -24,7 +24,9 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
 
             Button {
-                NSWorkspace.shared.open(URL(string: "https://github.com/konradmichalik/prtgbar")!)
+                if let url = URL(string: "https://github.com/konradmichalik/prtgbar") {
+                    NSWorkspace.shared.open(url)
+                }
             } label: {
                 Label("GitHub Repository", systemImage: "link")
             }

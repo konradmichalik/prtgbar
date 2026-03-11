@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -7,6 +8,7 @@ struct SettingsView: View {
     @State private var serverURL = ""
     @State private var apiKey = ""
     @State private var connectionStatus: ConnectionStatus = .idle
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     enum ConnectionStatus {
         case idle, testing, success, failed
@@ -29,17 +31,18 @@ struct SettingsView: View {
                 switch selectedTab {
                 case .general:
                     generalTab
+                case .connection:
+                    connectionTab
                 case .about:
                     AboutView()
                 }
             }
-            .frame(height: selectedTab == .general ? 280 : 300)
         }
-        .frame(width: 400)
+        .frame(width: 420)
         .onAppear {
             serverURL = appState.serverURL
             apiKey = appState.apiKey
-            // Ensure settings window appears above all other windows (LSUIElement app)
+            launchAtLogin = SMAppService.mainApp.status == .enabled
             DispatchQueue.main.async {
                 for window in NSApp.windows where window.title == "Settings" || window.identifier?.rawValue.contains("settings") == true {
                     window.level = .floating
@@ -56,9 +59,10 @@ struct SettingsView: View {
             serverSection
             refreshSection
             notificationSection
+            appearanceSection
         }
         .formStyle(.grouped)
-        .scrollDisabled(true)
+        .scrollDisabled(false)
     }
 
     // MARK: - Server
@@ -130,13 +134,54 @@ struct SettingsView: View {
 
     private var notificationSection: some View {
         Section("Notifications") {
-            Toggle("Notify when sensor goes down", isOn: $appState.notifyOnStatusChange)
+            Toggle("Enable notifications", isOn: $appState.notifyOnStatusChange)
                 .onChange(of: appState.notifyOnStatusChange) { _, newValue in
                     if newValue {
                         appState.requestNotificationPermission()
                     }
                 }
+
+            if appState.notifyOnStatusChange {
+                Toggle("Notify on sensor down", isOn: $appState.notifyOnDown)
+                Toggle("Notify on warnings", isOn: $appState.notifyOnWarning)
+                Toggle("Play notification sound", isOn: $appState.notificationSound)
+            }
         }
+    }
+
+    // MARK: - Appearance
+
+    private var appearanceSection: some View {
+        Section("Appearance") {
+            Toggle("Show badge count in menu bar", isOn: $appState.showBadgeCount)
+
+            Toggle("Launch at login", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { _, newValue in
+                    do {
+                        if newValue {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    } catch {
+                        launchAtLogin = SMAppService.mainApp.status == .enabled
+                    }
+                }
+        }
+    }
+
+    // MARK: - Connection Tab
+
+    private var connectionTab: some View {
+        Form {
+            Section("SSL / TLS") {
+                Toggle("Accept self-signed certificates", isOn: $appState.acceptSelfSignedCerts)
+                Text("Enable this if your PRTG server uses a self-signed SSL certificate.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 
     // MARK: - Actions
@@ -155,6 +200,7 @@ struct SettingsView: View {
 
 private enum SettingsTab: String, CaseIterable, Identifiable {
     case general
+    case connection
     case about
 
     var id: String { rawValue }
@@ -162,6 +208,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: "General"
+        case .connection: "Connection"
         case .about: "About"
         }
     }
