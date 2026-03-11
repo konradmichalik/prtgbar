@@ -5,85 +5,149 @@ struct MenubarView: View {
 
     @Environment(\.openSettings) private var openSettings
     @State private var isRefreshing = false
-    @AppStorage("groupByDevice") private var groupByDevice = false
+    @State private var searchText = ""
+    @State private var hideAcknowledged = false
+    @State private var showSearch = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            if appState.isConfigured && appState.treeNodes.isEmpty == false {
-                statusSummaryBar
+            if appState.isConfigured && !appState.treeNodes.isEmpty {
+                statusPillsRow
+                if showSearch {
+                    searchField
+                }
             }
             Divider()
             content
             Divider()
             footer
         }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.regularMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
 
     // MARK: - Header
 
     private var header: some View {
-        HStack {
-            Text("PRTGBar")
-                .font(.headline)
+        HStack(spacing: 8) {
+            (Text("PRTG").font(.headline) + Text("bar").font(.caption).baselineOffset(6))
                 .foregroundStyle(.primary)
 
             Spacer()
 
-            if let error = appState.lastError {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.yellow)
-                    .help(error)
-            }
-
-            Button {
-                groupByDevice.toggle()
-            } label: {
-                Image(systemName: groupByDevice ? "list.bullet" : "list.bullet.indent")
-            }
-            .buttonStyle(.borderless)
-            .help(groupByDevice ? "Flat list" : "Group by device")
-
-            if !appState.serverURL.isEmpty {
-                Button {
-                    openPrtgDashboard(serverURL: appState.serverURL)
-                } label: {
-                    Image(systemName: "globe")
-                }
-                .buttonStyle(.borderless)
-                .help("Open PRTG")
-            }
+            headerButtons
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
     }
 
-    // MARK: - Status Summary
-
-    private var statusSummaryBar: some View {
-        HStack(spacing: 12) {
+    private var statusPillsRow: some View {
+        HStack(spacing: 10) {
             let counts = appState.statusCounts
-            statusPill(count: counts.up, status: .up)
-            statusPill(count: counts.down, status: .down)
-            statusPill(count: counts.warning, status: .warning)
+            statusPill(count: counts.up, color: .green)
+            if counts.down > 0 {
+                statusPill(count: counts.down, color: .red)
+            }
+            if counts.warning > 0 {
+                statusPill(count: counts.warning, color: .orange)
+            }
             if counts.paused > 0 {
-                statusPill(count: counts.paused, status: .paused)
+                statusPill(count: counts.paused, color: .secondary)
             }
             Spacer()
         }
-        .padding(.horizontal, 14)
-        .padding(.bottom, 6)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 
-    private func statusPill(count: Int, status: SensorStatus) -> some View {
+    private func statusPill(count: Int, color: Color) -> some View {
         HStack(spacing: 3) {
             Circle()
-                .fill(status.color)
-                .frame(width: 6, height: 6)
+                .fill(color)
+                .frame(width: 7, height: 7)
             Text("\(count)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var headerButtons: some View {
+        HStack(spacing: 10) {
+            if appState.isConfigured && !appState.treeNodes.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSearch.toggle()
+                        if !showSearch { searchText = "" }
+                    }
+                } label: {
+                    Image(systemName: showSearch ? "magnifyingglass.circle.fill" : "magnifyingglass")
+                        .font(.system(size: 13))
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(showSearch ? Color.accentColor : Color.secondary)
+                .help("Search")
+            }
+
+            Button {
+                hideAcknowledged.toggle()
+            } label: {
+                Image(systemName: hideAcknowledged ? "checkmark.circle.fill" : "checkmark.circle")
+                    .font(.system(size: 13))
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(hideAcknowledged ? Color.accentColor : Color.secondary)
+            .help(hideAcknowledged ? "Show acknowledged" : "Hide acknowledged")
+
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 13))
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Settings")
+        }
+    }
+
+    // MARK: - Search
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            TextField("Search sensors...", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.callout)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.primary.opacity(0.04))
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Content
@@ -102,7 +166,8 @@ struct MenubarView: View {
                     statusCounts: appState.statusCounts,
                     serverURL: appState.serverURL,
                     problemTimestamps: appState.problemTimestamps,
-                    groupByDevice: groupByDevice
+                    searchText: searchText,
+                    hideAcknowledged: hideAcknowledged
                 )
             }
         }
@@ -158,8 +223,16 @@ struct MenubarView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        HStack {
-            if let updated = appState.lastUpdated {
+        HStack(spacing: 8) {
+            if let error = appState.lastError {
+                Circle()
+                    .fill(.red)
+                    .frame(width: 5, height: 5)
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+            } else if let updated = appState.lastUpdated {
                 Text(relativeTimeString(from: updated))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -173,7 +246,7 @@ struct MenubarView: View {
                 }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.caption)
+                    .font(.system(size: 10))
                     .rotationEffect(.degrees(isRefreshing ? 360 : 0))
                     .animation(
                         isRefreshing
@@ -188,28 +261,33 @@ struct MenubarView: View {
 
             Spacer()
 
-            Button {
-                NSApp.activate(ignoringOtherApps: true)
-                openSettings()
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.caption)
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("Settings")
+            HStack(spacing: 12) {
+                if !appState.serverURL.isEmpty {
+                    Button {
+                        openPrtgDashboard(serverURL: appState.serverURL)
+                    } label: {
+                        Image("MenubarIcon")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 13, height: 13)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help("Open PRTG")
+                }
 
-            Button {
-                NSApp.terminate(nil)
-            } label: {
-                Image(systemName: "power")
-                    .font(.caption)
+                Button {
+                    NSApp.terminate(nil)
+                } label: {
+                    Image(systemName: "power")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("Quit PRTGBar")
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("Quit PRTGBar")
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
 
