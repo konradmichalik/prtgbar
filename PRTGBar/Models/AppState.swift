@@ -38,6 +38,7 @@ final class AppState: ObservableObject {
     @AppStorage("notifyOnWarning") var notifyOnWarning = false
     @AppStorage("showBadgeCount") var showBadgeCount = true
     @AppStorage("acceptSelfSignedCerts") var acceptSelfSignedCerts = true
+    @AppStorage("showAllProbes") var showAllProbes = true
 
     // MARK: - API Key (Keychain)
 

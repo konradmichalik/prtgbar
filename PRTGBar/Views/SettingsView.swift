@@ -154,6 +154,7 @@ struct SettingsView: View {
     private var appearanceSection: some View {
         Section("Appearance") {
             Toggle("Show badge count in menu bar", isOn: $appState.showBadgeCount)
+            Toggle("Show all probes section", isOn: $appState.showAllProbes)
 
             Toggle("Launch at login", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, newValue in
