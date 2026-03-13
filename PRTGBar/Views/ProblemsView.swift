@@ -7,19 +7,40 @@ struct ProblemsView: View {
     let problemTimestamps: [Int: Date]
     let searchText: String
     let hideAcknowledged: Bool
+    var showAllProbes: Bool = true
+    var statusFilter: StatusPillFilter?
 
     var body: some View {
         let allProblems = ProblemItem.collect(from: treeNodes, fallbackTimestamps: problemTimestamps)
         let filtered = filterProblems(allProblems)
+        let errors = filtered.filter { $0.status == .down || $0.status == .partialdown }
+        let warnings = filtered.filter { $0.status != .down && $0.status != .partialdown }
+        let hasAlerts = !errors.isEmpty || !warnings.isEmpty
 
-        if allProblems.isEmpty {
-            allGoodView
-        } else if filtered.isEmpty {
-            noMatchView
+        if !hasAlerts && !showAllProbes {
+            if allProblems.isEmpty {
+                allGoodBanner
+                    .frame(maxWidth: .infinity, minHeight: 200)
+            } else {
+                noMatchView
+            }
         } else {
-            let errors = filtered.filter { $0.status == .down || $0.status == .partialdown }
-            let warnings = filtered.filter { $0.status != .down && $0.status != .partialdown }
-            alertList(errors: errors, warnings: warnings)
+            ScrollView {
+                VStack(spacing: 0) {
+                    if allProblems.isEmpty {
+                        allGoodBanner
+                    }
+                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                        alertSections(errors: errors, warnings: warnings)
+                        if showAllProbes {
+                            if hasAlerts { Divider() }
+                            allProbesSection
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                }
+            }
+            .scrollIndicators(.never)
         }
     }
 
@@ -27,6 +48,11 @@ struct ProblemsView: View {
 
     private func filterProblems(_ items: [ProblemItem]) -> [ProblemItem] {
         var result = items
+
+        if let statusFilter {
+            let allowed = statusFilter.statuses
+            result = result.filter { allowed.contains($0.status) }
+        }
 
         if hideAcknowledged {
             result = result.filter { item in
@@ -50,18 +76,22 @@ struct ProblemsView: View {
 
     // MARK: - All Good
 
-    private var allGoodView: some View {
-        VStack(spacing: 12) {
-            Spacer()
+    private var allGoodBanner: some View {
+        VStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 36))
+                .font(.system(size: 28))
                 .foregroundStyle(.green)
             Text("All \(statusCounts.total) sensors up")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
-            Spacer()
         }
-        .frame(maxWidth: .infinity, minHeight: 200)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+    }
+
+    @ViewBuilder
+    private var allProbesSection: some View {
+        AllProbesView(treeNodes: treeNodes, serverURL: serverURL, searchText: searchText, statusFilter: statusFilter)
     }
 
     // MARK: - No Match
@@ -80,46 +110,47 @@ struct ProblemsView: View {
         .frame(maxWidth: .infinity, minHeight: 120)
     }
 
-    // MARK: - Alert List
+    // MARK: - Alert Sections
 
-    private func alertList(errors: [ProblemItem], warnings: [ProblemItem]) -> some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
-                if !errors.isEmpty {
-                    Section {
-                        ForEach(Array(errors.enumerated()), id: \.element.id) { index, item in
-                            AlertRowView(item: item, serverURL: serverURL)
-                            if index < errors.count - 1 {
-                                Divider()
-                            }
-                        }
-                    } header: {
-                        sectionHeader("Critical Errors", count: errors.count)
+    @ViewBuilder
+    private func alertSections(errors: [ProblemItem], warnings: [ProblemItem]) -> some View {
+        if !errors.isEmpty {
+            Section {
+                ForEach(Array(errors.enumerated()), id: \.element.id) { index, item in
+                    AlertRowView(item: item, serverURL: serverURL)
+                    if index < errors.count - 1 {
+                        Divider()
                     }
                 }
-
-                if !warnings.isEmpty {
-                    if !errors.isEmpty { Divider() }
-                    Section {
-                        ForEach(Array(warnings.enumerated()), id: \.element.id) { index, item in
-                            AlertRowView(item: item, serverURL: serverURL)
-                            if index < warnings.count - 1 {
-                                Divider()
-                            }
-                        }
-                    } header: {
-                        sectionHeader("Warnings", count: warnings.count)
-                    }
-                }
+            } header: {
+                SectionHeaderView(title: "Critical Errors", count: errors.count)
             }
-            .padding(.horizontal, 12)
         }
-        .scrollIndicators(.never)
+
+        if !warnings.isEmpty {
+            if !errors.isEmpty { Divider() }
+            Section {
+                ForEach(Array(warnings.enumerated()), id: \.element.id) { index, item in
+                    AlertRowView(item: item, serverURL: serverURL)
+                    if index < warnings.count - 1 {
+                        Divider()
+                    }
+                }
+            } header: {
+                SectionHeaderView(title: "Warnings", count: warnings.count)
+            }
+        }
     }
 
-    // MARK: - Section Header
+}
 
-    private func sectionHeader(_ title: String, count: Int) -> some View {
+// MARK: - Section Header
+
+struct SectionHeaderView: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
         HStack {
             Text("\(title.uppercased()) (\(count))")
                 .font(.caption2.weight(.semibold))

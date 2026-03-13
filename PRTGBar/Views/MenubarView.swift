@@ -8,6 +8,7 @@ struct MenubarView: View {
     @State private var searchText = ""
     @State private var hideAcknowledged = false
     @State private var showSearch = false
+    @State private var statusFilter: StatusPillFilter?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,17 +51,17 @@ struct MenubarView: View {
     }
 
     private var statusPillsRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 4) {
             let counts = appState.statusCounts
-            statusPill(count: counts.up, color: .green)
+            statusPill(count: counts.up, color: .green, filter: .up)
             if counts.down > 0 {
-                statusPill(count: counts.down, color: .red)
+                statusPill(count: counts.down, color: .red, filter: .down)
             }
             if counts.warning > 0 {
-                statusPill(count: counts.warning, color: .orange)
+                statusPill(count: counts.warning, color: .orange, filter: .warning)
             }
             if counts.paused > 0 {
-                statusPill(count: counts.paused, color: .secondary)
+                statusPill(count: counts.paused, color: .secondary, filter: .paused)
             }
             Spacer()
         }
@@ -68,15 +69,29 @@ struct MenubarView: View {
         .padding(.bottom, 8)
     }
 
-    private func statusPill(count: Int, color: Color) -> some View {
-        HStack(spacing: 3) {
-            Circle()
-                .fill(color)
-                .frame(width: 7, height: 7)
-            Text("\(count)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private func statusPill(count: Int, color: Color, filter: StatusPillFilter) -> some View {
+        let isActive = statusFilter == filter
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                statusFilter = isActive ? nil : filter
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 7, height: 7)
+                Text("\(count)")
+                    .font(.caption)
+                    .foregroundStyle(isActive ? .primary : .secondary)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                Capsule()
+                    .fill(isActive ? color.opacity(0.15) : .clear)
+            )
         }
+        .buttonStyle(.borderless)
     }
 
     private var headerButtons: some View {
@@ -167,7 +182,9 @@ struct MenubarView: View {
                     serverURL: appState.serverURL,
                     problemTimestamps: appState.problemTimestamps,
                     searchText: searchText,
-                    hideAcknowledged: hideAcknowledged
+                    hideAcknowledged: hideAcknowledged,
+                    showAllProbes: appState.showAllProbes,
+                    statusFilter: statusFilter
                 )
             }
         }
