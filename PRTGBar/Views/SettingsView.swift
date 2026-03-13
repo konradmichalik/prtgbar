@@ -56,7 +56,6 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            serverSection
             refreshSection
             notificationSection
             appearanceSection
@@ -175,6 +174,8 @@ struct SettingsView: View {
 
     private var connectionTab: some View {
         Form {
+            serverSection
+
             Section("SSL / TLS") {
                 Toggle("Accept self-signed certificates", isOn: $appState.acceptSelfSignedCerts)
                 Text("Enable this if your PRTG server uses a self-signed SSL certificate.")
