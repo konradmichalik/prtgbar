@@ -251,11 +251,16 @@ struct ProblemItem: Identifiable {
             walk(node, ancestors: [], fallbackTimestamps: fallbackTimestamps, into: &items)
         }
         return items.sorted { a, b in
+            // Primary: severity (lower = more critical)
+            if a.status.severity != b.status.severity {
+                return a.status.severity < b.status.severity
+            }
+            // Secondary: downSince date (newest first)
             switch (a.downSince, b.downSince) {
-            case (let da?, let db?): return da > db  // more recent start = newest problem first
-            case (_?, nil):          return true      // known duration before unknown
+            case (let da?, let db?): return da > db
+            case (_?, nil):          return true
             case (nil, _?):          return false
-            case (nil, nil):         return a.status.severity < b.status.severity
+            case (nil, nil):         return a.sensorName < b.sensorName
             }
         }
     }
