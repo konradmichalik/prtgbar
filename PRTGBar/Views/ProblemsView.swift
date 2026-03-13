@@ -150,14 +150,21 @@ struct SectionHeaderView: View {
     let count: Int
 
     var body: some View {
-        HStack {
-            Text("\(title.uppercased()) (\(count))")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.tertiary)
-            Spacer()
+        VStack(spacing: 0) {
+            Divider()
+            HStack {
+                Text("\(title.uppercased()) (\(count))")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            Divider()
         }
-        .padding(.vertical, 8)
-        .background(.regularMaterial)
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial)
+        .padding(.horizontal, -12)
     }
 }
 
