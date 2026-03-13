@@ -1,7 +1,6 @@
 import SwiftUI
 import Combine
 import UserNotifications
-import AppKit
 
 @MainActor
 final class AppState: ObservableObject {
@@ -182,7 +181,12 @@ final class AppState: ObservableObject {
             }
 
             if shouldNotify {
-                sendNotification(sensorName: sensor.name, sensorStatus: status, playSound: notificationSound)
+                sendNotification(
+                    sensorName: sensor.name,
+                    deviceName: sensor.parent?.name,
+                    sensorStatus: status,
+                    playSound: notificationSound
+                )
             }
         }
 
@@ -190,16 +194,21 @@ final class AppState: ObservableObject {
         problemTimestamps = newTimestamps
     }
 
-    nonisolated private func sendNotification(sensorName: String, sensorStatus: SensorStatus, playSound: Bool) {
+    nonisolated private func sendNotification(
+        sensorName: String,
+        deviceName: String?,
+        sensorStatus: SensorStatus,
+        playSound: Bool
+    ) {
         let content = UNMutableNotificationContent()
         content.title = "Sensor \(sensorStatus.notificationLabel)"
-        content.body = sensorName
+        if let deviceName, !deviceName.isEmpty {
+            content.body = "\(deviceName) › \(sensorName)"
+        } else {
+            content.body = sensorName
+        }
         if playSound {
             content.sound = .default
-        }
-
-        if let iconURL = makeStatusIconURL(for: sensorStatus) {
-            content.attachments = (try? [UNNotificationAttachment(identifier: "status-icon", url: iconURL)]) ?? []
         }
 
         let request = UNNotificationRequest(
@@ -209,34 +218,6 @@ final class AppState: ObservableObject {
         )
 
         UNUserNotificationCenter.current().add(request)
-    }
-
-    nonisolated private func makeStatusIconURL(for status: SensorStatus) -> URL? {
-        let fileName = "prtgbar-notif-\(status.rawValue).png"
-        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
-        if FileManager.default.fileExists(atPath: url.path) { return url }
-
-        let size: CGFloat = 64
-        let symbolName = status.notificationSymbol
-        let nsColor = NSColor(status.color)
-
-        guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) else { return nil }
-
-        let config = NSImage.SymbolConfiguration(pointSize: size * 0.7, weight: .regular)
-        let configured = symbol.withSymbolConfiguration(config) ?? symbol
-
-        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            nsColor.setFill()
-            configured.draw(in: rect)
-            return true
-        }
-
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff),
-              let png = rep.representation(using: .png, properties: [:]),
-              (try? png.write(to: url)) != nil else { return nil }
-
-        return url
     }
 
     // MARK: - Helpers
