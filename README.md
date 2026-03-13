@@ -46,6 +46,12 @@ brew install konradmichalik/tap/prtgbar
 > [!TIP]
 > After installing via Homebrew, launch PRTGBar from Spotlight or Applications. On first launch, macOS may ask you to allow the app in **System Settings > Privacy & Security**.
 
+### Upgrade
+
+```sh
+brew upgrade prtgbar
+```
+
 ### Build from source
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
