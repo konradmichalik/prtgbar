@@ -141,7 +141,6 @@ struct ProblemsView: View {
             }
         }
     }
-
 }
 
 // MARK: - Section Header
