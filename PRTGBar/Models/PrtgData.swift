@@ -61,14 +61,6 @@ enum SensorStatus: String, Codable, CaseIterable {
 
     static let problemStatuses: Set<SensorStatus> = [.down, .partialdown, .warning, .unusual]
 
-    var notificationSymbol: String {
-        switch self {
-        case .down, .partialdown: "exclamationmark.circle.fill"
-        case .warning, .unusual: "exclamationmark.triangle.fill"
-        default: symbolName
-        }
-    }
-
     var notificationLabel: String {
         switch self {
         case .down: "Down"
