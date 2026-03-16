@@ -143,6 +143,22 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Acknowledge
+
+    func acknowledgeAlarm(objectId: Int) async {
+        do {
+            try await Task.detached { [serverURL, apiKey, acceptSelfSignedCerts] in
+                try await PrtgClient.acknowledgeAlarm(
+                    objectId: objectId,
+                    serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
+                )
+            }.value
+            await refresh()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
     // MARK: - Notifications
 
     func requestNotificationPermission() {

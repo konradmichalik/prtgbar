@@ -3,6 +3,11 @@ import SwiftUI
 struct AlertRowView: View {
     let item: ProblemItem
     let serverURL: String
+    @EnvironmentObject private var appState: AppState
+
+    private var isAcknowledged: Bool {
+        item.message.map { SensorMessage($0).isAcknowledged } ?? false
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -15,6 +20,12 @@ struct AlertRowView: View {
                 openInPrtg(objectId: item.id, serverURL: serverURL)
             }
             Divider()
+            if !isAcknowledged {
+                Button("Acknowledge") {
+                    Task { await appState.acknowledgeAlarm(objectId: item.id) }
+                }
+                Divider()
+            }
             Button("Copy Sensor Name") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(item.sensorName, forType: .string)

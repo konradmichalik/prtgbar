@@ -189,6 +189,25 @@ enum PrtgClient {
         return true
     }
 
+    // MARK: - Acknowledge Alarm
+
+    static func acknowledgeAlarm(
+        objectId: Int, message: String = "Acknowledged via PRTGBar",
+        serverURL: String, token: String, acceptSelfSignedCerts: Bool = true
+    ) async throws {
+        let url = try buildURL(
+            serverURL: serverURL,
+            path: "/api/acknowledgealarm.htm",
+            token: token,
+            queryItems: [
+                URLQueryItem(name: "id", value: "\(objectId)"),
+                URLQueryItem(name: "ackmsg", value: message),
+            ]
+        )
+
+        _ = try await performRequest(url: url, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts)
+    }
+
     // MARK: - V1 Table Fetch
 
     private static func fetchTable(
