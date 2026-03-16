@@ -163,7 +163,9 @@ final class AppState: ObservableObject {
     // MARK: - Notifications
 
     func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        Task {
+            try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        }
     }
 
     private func detectStatusChanges(objects: [PrtgObject]) {
