@@ -49,7 +49,7 @@ brew install konradmichalik/tap/prtgbar
 ### Upgrade
 
 ```sh
-brew upgrade prtgbar
+brew update && brew upgrade prtgbar
 ```
 
 ### Build from source
