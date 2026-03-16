@@ -38,6 +38,7 @@ final class AppState: ObservableObject {
     @AppStorage("showBadgeCount") var showBadgeCount = true
     @AppStorage("acceptSelfSignedCerts") var acceptSelfSignedCerts = true
     @AppStorage("showAllProbes") var showAllProbes = true
+    @AppStorage("showAcknowledged") var showAcknowledged = false
 
     // MARK: - API Key (Keychain)
 
@@ -223,7 +224,12 @@ final class AppState: ObservableObject {
     // MARK: - Helpers
 
     private func countDown(_ node: TreeNode) -> Int {
-        if node.kind == .sensor, node.status == .down { return 1 }
+        if node.kind == .sensor, node.status == .down {
+            if !showAcknowledged, let message = node.message, SensorMessage(message).isAcknowledged {
+                return 0
+            }
+            return 1
+        }
         return node.children.reduce(0) { $0 + countDown($1) }
     }
 

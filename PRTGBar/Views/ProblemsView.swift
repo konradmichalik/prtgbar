@@ -6,7 +6,7 @@ struct ProblemsView: View {
     let serverURL: String
     let problemTimestamps: [Int: Date]
     let searchText: String
-    let hideAcknowledged: Bool
+    let showAcknowledged: Bool
     var showAllProbes: Bool = true
     var statusFilter: StatusPillFilter?
 
@@ -54,7 +54,7 @@ struct ProblemsView: View {
             result = result.filter { allowed.contains($0.status) }
         }
 
-        if hideAcknowledged {
+        if !showAcknowledged {
             result = result.filter { item in
                 guard let message = item.message else { return true }
                 return !SensorMessage(message).isAcknowledged
