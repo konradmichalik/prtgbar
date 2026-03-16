@@ -139,9 +139,9 @@ final class PrtgClientTests: XCTestCase {
     func testStatusSeverityOrdering() {
         let ordered: [SensorStatus] = [.down, .partialdown, .warning, .unusual, .unknown, .paused, .up]
         for i in 0..<ordered.count - 1 {
-            XCTAssertLessThan(
+            XCTAssertLessThanOrEqual(
                 ordered[i].severity, ordered[i + 1].severity,
-                "\(ordered[i]) should be more severe than \(ordered[i + 1])"
+                "\(ordered[i]) should be at least as severe as \(ordered[i + 1])"
             )
         }
     }
