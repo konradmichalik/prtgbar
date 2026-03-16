@@ -77,6 +77,7 @@ struct AlertRowView: View {
                 .font(.system(size: 13))
                 .frame(width: 18, alignment: .center)
                 .padding(.top, 2)
+                .help(statusTooltip)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.sensorName)
@@ -103,10 +104,22 @@ struct AlertRowView: View {
         switch item.status {
         case .down, .partialdown:
             "exclamationmark.circle"
-        case .warning, .unusual:
+        case .warning:
             "exclamationmark.triangle"
+        case .unusual:
+            "exclamationmark.circle"
         default:
             item.status.symbolName
+        }
+    }
+
+    private var statusTooltip: String {
+        switch item.status {
+        case .down: "Down – Sensor has failed"
+        case .partialdown: "Partial Down – Some channels have failed"
+        case .warning: "Warning – Threshold exceeded"
+        case .unusual: "Unusual – Abnormal behavior detected"
+        default: item.status.notificationLabel
         }
     }
 }

@@ -51,7 +51,7 @@ enum SensorStatus: String, Codable, CaseIterable {
         switch self {
         case .up: .green
         case .down: .red
-        case .warning: .yellow
+        case .warning: .orange
         case .paused: .secondary
         case .unusual: .orange
         case .partialdown: .orange
@@ -76,7 +76,7 @@ enum SensorStatus: String, Codable, CaseIterable {
         case .down: 0
         case .partialdown: 1
         case .warning: 2
-        case .unusual: 3
+        case .unusual: 2
         case .unknown: 4
         case .paused: 5
         case .up: 6
