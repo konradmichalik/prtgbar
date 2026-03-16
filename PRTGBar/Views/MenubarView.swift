@@ -111,14 +111,14 @@ struct MenubarView: View {
             }
 
             Button {
-                appState.hideAcknowledged.toggle()
+                appState.showAcknowledged.toggle()
             } label: {
-                Image(systemName: appState.hideAcknowledged ? "checkmark.circle.fill" : "checkmark.circle")
+                Image(systemName: appState.showAcknowledged ? "checkmark.circle.fill" : "checkmark.circle")
                     .font(.system(size: 13))
             }
             .buttonStyle(.borderless)
-            .foregroundStyle(appState.hideAcknowledged ? Color.accentColor : Color.secondary)
-            .help(appState.hideAcknowledged ? "Show acknowledged" : "Hide acknowledged")
+            .foregroundStyle(appState.showAcknowledged ? Color.accentColor : Color.secondary)
+            .help(appState.showAcknowledged ? "Hide acknowledged" : "Show acknowledged")
 
             Button {
                 NSApp.activate(ignoringOtherApps: true)
@@ -181,7 +181,7 @@ struct MenubarView: View {
                     serverURL: appState.serverURL,
                     problemTimestamps: appState.problemTimestamps,
                     searchText: searchText,
-                    hideAcknowledged: appState.hideAcknowledged,
+                    showAcknowledged: appState.showAcknowledged,
                     showAllProbes: appState.showAllProbes,
                     statusFilter: statusFilter
                 )
