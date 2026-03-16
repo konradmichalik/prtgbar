@@ -144,6 +144,22 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Acknowledge
+
+    func acknowledgeAlarm(objectId: Int) async {
+        do {
+            try await Task.detached { [serverURL, apiKey, acceptSelfSignedCerts] in
+                try await PrtgClient.acknowledgeAlarm(
+                    objectId: objectId,
+                    serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
+                )
+            }.value
+            await refresh()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
     // MARK: - Notifications
 
     func requestNotificationPermission() {
@@ -223,11 +239,13 @@ final class AppState: ObservableObject {
 
     // MARK: - Helpers
 
+    private func isAcknowledged(_ node: TreeNode) -> Bool {
+        node.message.map { SensorMessage($0).isAcknowledged } ?? false
+    }
+
     private func countDown(_ node: TreeNode) -> Int {
         if node.kind == .sensor, node.status == .down {
-            if !showAcknowledged, let message = node.message, SensorMessage(message).isAcknowledged {
-                return 0
-            }
+            if !showAcknowledged, isAcknowledged(node) { return 0 }
             return 1
         }
         return node.children.reduce(0) { $0 + countDown($1) }
@@ -236,6 +254,9 @@ final class AppState: ObservableObject {
     private func countSensors(_ node: TreeNode) -> StatusSummary {
         var result = StatusSummary.empty
         if node.kind == .sensor {
+            if !showAcknowledged, isAcknowledged(node), SensorStatus.problemStatuses.contains(node.status) {
+                return result
+            }
             switch node.status {
             case .up: result = StatusSummary(up: 1, down: 0, warning: 0, paused: 0, unknown: 0)
             case .down: result = StatusSummary(up: 0, down: 1, warning: 0, paused: 0, unknown: 0)

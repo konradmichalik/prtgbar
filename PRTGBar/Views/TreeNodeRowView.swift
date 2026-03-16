@@ -6,6 +6,7 @@ struct TreeNodeRowView: View {
     let searchActive: Bool
     var depth: Int = 0
 
+    @EnvironmentObject private var appState: AppState
     @State private var isExpanded = false
 
     private var indent: CGFloat { CGFloat(depth) * 16 }
@@ -93,6 +94,15 @@ struct TreeNodeRowView: View {
             openInPrtg(objectId: node.id, serverURL: serverURL)
         }
         Divider()
+        if node.kind == .sensor, SensorStatus.problemStatuses.contains(node.status) {
+            let isAcknowledged = node.message.map { SensorMessage($0).isAcknowledged } ?? false
+            if !isAcknowledged {
+                Button("Acknowledge") {
+                    Task { await appState.acknowledgeAlarm(objectId: node.id) }
+                }
+                Divider()
+            }
+        }
         Button("Copy Name") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(node.name, forType: .string)
