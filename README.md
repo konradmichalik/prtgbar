@@ -39,6 +39,9 @@ PRTGBar sits in your macOS menu bar and shows all down and warning sensors from 
 
 ### Homebrew (recommended)
 
+[![Homebrew version](https://img.shields.io/endpoint?url=https%3A%2F%2Fkonradmichalik.github.io%2Fhomebrew-tap%2Fbadges%2Fprtgbar-version.json&style=flat-square&logo=homebrew)](https://github.com/konradmichalik/homebrew-tap)
+[![Homebrew downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fkonradmichalik.github.io%2Fhomebrew-tap%2Fbadges%2Fprtgbar-downloads.json&style=flat-square&logo=homebrew)](https://github.com/konradmichalik/homebrew-tap)
+
 ```sh
 brew install konradmichalik/tap/prtgbar
 ```
