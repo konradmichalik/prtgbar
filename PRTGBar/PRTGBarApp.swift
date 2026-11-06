@@ -4,26 +4,47 @@ import UserNotifications
 @main
 struct PRTGBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var appState = AppState()
 
     var body: some Scene {
-        MenuBarExtra {
-            MenubarView()
-                .environmentObject(appState)
-                .frame(width: 380, height: 520)
-                .task { appState.onLaunch() }
-        } label: {
-            Image("MenubarIcon")
-            if let count = appState.badgeCount {
-                Text("\(count)")
-            }
+        // Declared first so SwiftUI creates it at launch; it only hosts SettingsOpener.
+        Window("PRTGBar", id: SettingsOpener.windowId) {
+            SettingsOpener()
         }
-        .menuBarExtraStyle(.window)
+        .windowResizability(.contentSize)
 
         Settings {
             SettingsView()
-                .environmentObject(appState)
+                .environmentObject(appDelegate.appState)
         }
+    }
+}
+
+/// AppKit cannot open the SwiftUI Settings scene reliably on macOS 14+, so the status item
+/// posts a notification and this invisible view calls `openSettings` on its behalf.
+struct SettingsOpener: View {
+    static let windowId = "settings-opener"
+
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .onReceive(NotificationCenter.default.publisher(for: .prtgBarOpenSettings)) { _ in
+                NSApp.activate()
+                openSettings()
+            }
+            .onAppear(perform: hideHostWindow)
+    }
+
+    private func hideHostWindow() {
+        let window = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(Self.windowId) == true }
+        guard let window else { return }
+        window.styleMask = [.borderless]
+        window.alphaValue = 0
+        window.ignoresMouseEvents = true
+        window.isExcludedFromWindowsMenu = true
+        window.collectionBehavior = [.auxiliary, .ignoresCycle, .transient, .canJoinAllSpaces]
+        window.setFrame(NSRect(x: -10_000, y: -10_000, width: 1, height: 1), display: false)
     }
 }
 
@@ -40,40 +61,13 @@ final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    let appState = AppState()
     private let notificationHandler = NotificationHandler()
-    private var eventMonitor: Any?
+    private var statusItemController: StatusItemController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = notificationHandler
-        installRightClickMenu()
-    }
-
-    private func installRightClickMenu() {
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
-            guard let self, let window = event.window,
-                  String(describing: type(of: window)).contains("StatusBar") else {
-                return event
-            }
-            showStatusItemMenu(from: window)
-            return nil
-        }
-    }
-
-    private func showStatusItemMenu(from window: NSWindow) {
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Open PRTGBar", action: #selector(openPopover), keyEquivalent: ""))
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit PRTGBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: 0), in: window.contentView)
-    }
-
-    @objc private func openPopover() {
-        // Simulate a left-click on the status item to open the popover
-        if let button = NSApp.windows
-            .first(where: { String(describing: type(of: $0)).contains("StatusBar") })?
-            .contentView?.subviews.first as? NSControl {
-            button.performClick(nil)
-        }
+        statusItemController = StatusItemController(appState: appState)
+        appState.onLaunch()
     }
 }

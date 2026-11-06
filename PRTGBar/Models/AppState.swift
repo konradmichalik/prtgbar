@@ -12,20 +12,12 @@ final class AppState: ObservableObject {
     @Published var lastError: String?
     @Published var lastUpdated: Date?
     @Published var isConfigured = false
+    @Published private(set) var menuModel = MenuModel.make(
+        roots: [], timestamps: [:], sort: .newestFirst, serverURL: "",
+        lastUpdated: nil, error: nil, snoozedUntil: nil
+    )
 
-    var badgeCount: Int? {
-        guard showBadgeCount else { return nil }
-        let count = treeNodes.reduce(0) { total, node in
-            total + countDown(node)
-        }
-        return count > 0 ? count : nil
-    }
-
-    var statusCounts: StatusSummary {
-        treeNodes.reduce(into: StatusSummary.empty) { result, node in
-            result += countSensors(node)
-        }
-    }
+    let history = StatusHistory(fileURL: DemoData.isEnabled ? nil : StatusHistory.defaultFileURL)
 
     // MARK: - Settings (persisted)
 
@@ -39,6 +31,9 @@ final class AppState: ObservableObject {
     @AppStorage("acceptSelfSignedCerts") var acceptSelfSignedCerts = true
     @AppStorage("showAllProbes") var showAllProbes = true
     @AppStorage("showAcknowledged") var showAcknowledged = false
+    @AppStorage("showWarningIndicator") var showWarningIndicator = false
+    @AppStorage("problemSort") var problemSort = ProblemSort.newestFirst.rawValue
+    @AppStorage("snoozedUntil") var snoozedUntil: Double = 0
 
     // MARK: - API Key (Keychain)
 
@@ -57,6 +52,7 @@ final class AppState: ObservableObject {
     // MARK: - Lifecycle
 
     func onLaunch() {
+        try? history.load()
         if DemoData.isEnabled {
             loadDemoData()
             return
@@ -64,6 +60,7 @@ final class AppState: ObservableObject {
         if notifyOnStatusChange {
             requestNotificationPermission()
         }
+        updateMenuModel()
         startPolling()
     }
 
@@ -72,6 +69,8 @@ final class AppState: ObservableObject {
         problemTimestamps = DemoData.problemTimestamps
         lastUpdated = Date()
         isConfigured = true
+        recordHistory(sensorStates(in: treeNodes))
+        updateMenuModel()
     }
 
     // MARK: - Polling
@@ -116,6 +115,7 @@ final class AppState: ObservableObject {
             let tree = TreeBuilder.buildTree(from: objects)
 
             detectStatusChanges(objects: objects)
+            recordHistory(sensorStates(in: tree))
 
             var transaction = Transaction()
             transaction.disablesAnimations = true
@@ -129,6 +129,7 @@ final class AppState: ObservableObject {
         }
 
         isLoading = false
+        updateMenuModel()
     }
 
     func testConnection() async -> Bool {
@@ -144,20 +145,79 @@ final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - Acknowledge
+    // MARK: - Write Actions
 
-    func acknowledgeAlarm(objectId: Int) async {
+    func acknowledge(ids: [Int], message: String?) async {
+        await performWrite { serverURL, apiKey, acceptSelfSignedCerts in
+            try await PrtgClient.acknowledgeAlarm(
+                objectIds: ids, message: message,
+                serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
+            )
+        }
+    }
+
+    func pause(id: Int, minutes: Int?) async {
+        await performWrite { serverURL, apiKey, acceptSelfSignedCerts in
+            try await PrtgClient.pauseObject(
+                objectId: id, minutes: minutes, message: nil,
+                serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
+            )
+        }
+    }
+
+    /// Failures surface through `lastError` so the menu shows them, e.g. the read-only copy for 401/403.
+    private func performWrite(_ write: @escaping @Sendable (String, String, Bool) async throws -> Void) async {
+        guard !DemoData.isEnabled else { return }
         do {
             try await Task.detached { [serverURL, apiKey, acceptSelfSignedCerts] in
-                try await PrtgClient.acknowledgeAlarm(
-                    objectIds: [objectId], message: nil,
-                    serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
-                )
+                try await write(serverURL, apiKey, acceptSelfSignedCerts)
             }.value
             await refresh()
         } catch {
             lastError = error.localizedDescription
+            updateMenuModel()
         }
+    }
+
+    // MARK: - Menu
+
+    func snooze(until date: Date?) {
+        snoozedUntil = date?.timeIntervalSince1970 ?? 0
+        updateMenuModel()
+    }
+
+    func updateMenuModel(now: Date = Date()) {
+        let snoozeEnd = Date(timeIntervalSince1970: snoozedUntil)
+        menuModel = MenuModel.make(
+            roots: treeNodes,
+            timestamps: problemTimestamps,
+            sort: ProblemSort(rawValue: problemSort) ?? .newestFirst,
+            serverURL: DemoData.isEnabled ? DemoData.serverURL : serverURL,
+            lastUpdated: lastUpdated,
+            error: lastError,
+            snoozedUntil: snoozeEnd > now ? snoozeEnd : nil
+        )
+    }
+
+    private func recordHistory(_ states: [Int: SensorStatus]) {
+        history.record(states, at: Date())
+        try? history.save()
+    }
+
+    private func sensorStates(in nodes: [TreeNode]) -> [Int: SensorStatus] {
+        nodes.reduce(into: [:]) { states, node in
+            if node.kind == .sensor { states[node.id] = node.status }
+            states.merge(sensorStates(in: node.children)) { first, _ in first }
+        }
+    }
+
+    func findNode(id: Int) -> TreeNode? {
+        var stack = treeNodes
+        while let node = stack.popLast() {
+            if node.id == id { return node }
+            stack.append(contentsOf: node.children)
+        }
+        return nil
     }
 
     // MARK: - Notifications
@@ -237,38 +297,5 @@ final class AppState: ObservableObject {
         )
 
         UNUserNotificationCenter.current().add(request)
-    }
-
-    // MARK: - Helpers
-
-    private func isAcknowledged(_ node: TreeNode) -> Bool {
-        node.message.map { SensorMessage($0).isAcknowledged } ?? false
-    }
-
-    private func countDown(_ node: TreeNode) -> Int {
-        if node.kind == .sensor, node.status == .down {
-            if !showAcknowledged, isAcknowledged(node) { return 0 }
-            return 1
-        }
-        return node.children.reduce(0) { $0 + countDown($1) }
-    }
-
-    private func countSensors(_ node: TreeNode) -> StatusSummary {
-        var result = StatusSummary.empty
-        if node.kind == .sensor {
-            if !showAcknowledged, isAcknowledged(node), SensorStatus.problemStatuses.contains(node.status) {
-                return result
-            }
-            switch node.status {
-            case .up: result = StatusSummary(up: 1, down: 0, warning: 0, paused: 0, unknown: 0)
-            case .down: result = StatusSummary(up: 0, down: 1, warning: 0, paused: 0, unknown: 0)
-            case .warning: result = StatusSummary(up: 0, down: 0, warning: 1, paused: 0, unknown: 0)
-            case .paused: result = StatusSummary(up: 0, down: 0, warning: 0, paused: 1, unknown: 0)
-            default: result = StatusSummary(up: 0, down: 0, warning: 0, paused: 0, unknown: 1)
-            }
-        }
-        return node.children.reduce(into: result) { acc, child in
-            acc += countSensors(child)
-        }
     }
 }

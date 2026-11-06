@@ -5,6 +5,8 @@ enum DemoData {
         CommandLine.arguments.contains("--demo")
     }
 
+    static let serverURL = "https://prtg.example.com"
+
     // MARK: - Demo Tree
 
     static func buildTree() -> [TreeNode] {
