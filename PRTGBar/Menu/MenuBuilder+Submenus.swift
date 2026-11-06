@@ -23,7 +23,7 @@ extension MenuBuilder {
 // MARK: - Submenus
 
 extension MenuBuilder.Context {
-    func sensorDetailMenu(_ row: MenuBuilder.SensorRow) -> NSMenu {
+    func sensorDetailItems(_ row: MenuBuilder.SensorRow) -> [NSMenuItem] {
         let header = SensorDetailHeaderView(
             name: row.name,
             statusLine: statusLine(row),
@@ -35,16 +35,16 @@ extension MenuBuilder.Context {
         let pause = NSMenuItem(title: "Pause", action: nil, keyEquivalent: "")
         pause.submenu = pauseMenu(objectId: row.id)
         let acknowledge = row.isAcknowledged ? [] : [action("Acknowledge…") { $0.acknowledge(sensorIds: [row.id]) }]
-        return MenuBuilder.makeMenu([headerItem(header), .separator()] + acknowledge + [
+        return [headerItem(header), .separator()] + acknowledge + [
             pause,
             .separator(),
             action("Open in PRTG") { $0.open(objectId: row.id) },
             action("Copy Sensor Name") { $0.copy(row.name) },
             action("Copy Sensor ID") { $0.copy(String(row.id)) },
-        ])
+        ]
     }
 
-    func projectMenu(_ project: Project) -> NSMenu {
+    func projectItems(_ project: Project) -> [NSMenuItem] {
         let devices = project.devices.count == 1 ? "1 device" : "\(project.devices.count) devices"
         let sensors = project.sensorCount == 1 ? "1 sensor" : "\(project.sensorCount) sensors"
         let header = ProjectHeaderView(
@@ -56,10 +56,10 @@ extension MenuBuilder.Context {
                 + device.problemSensors.map { sensorItem(row(node: $0), showDevice: false) }
                 + [quietItem(device.quietSummary)]
         }
-        return MenuBuilder.makeMenu([headerItem(header)] + deviceItems + [
+        return [headerItem(header)] + deviceItems + [
             .separator(),
             action("Open Project in PRTG") { $0.open(objectId: project.id) },
-        ])
+        ]
     }
 
     func acknowledgedItems() -> [NSMenuItem] {

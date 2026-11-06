@@ -35,7 +35,7 @@ final class MenuBuilderTests: XCTestCase {
 
     func testProjectSubmenuHasDeviceHeadingsAndQuietLine() throws {
         let menu = build(makeModel())
-        let shop = try XCTUnwrap(item("Shop", in: menu)?.submenu)
+        let shop = populated(try XCTUnwrap(item("Shop", in: menu)?.submenu))
 
         XCTAssertNotNil(shop.items.first?.view, "project header view")
         let heading = try XCTUnwrap(shop.items.first { $0.isSectionHeader })
@@ -44,7 +44,7 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertFalse(quiet.isEnabled)
         XCTAssertNotNil(shop.items.first { $0.title == "Open Project in PRTG" })
 
-        let office = try XCTUnwrap(item("Office", in: menu)?.submenu)
+        let office = populated(try XCTUnwrap(item("Office", in: menu)?.submenu))
         XCTAssertNotNil(office.items.first { $0.title == "All 1 sensor up" })
     }
 
@@ -52,7 +52,7 @@ final class MenuBuilderTests: XCTestCase {
         let actions = RecordingActions()
         let menu = MenuBuilder.build(makeModel(), history: { _ in nil }, actions: actions)
         let down = index(of: "DOWN", in: menu)
-        let detail = try XCTUnwrap(menu.items[down + 1].submenu)
+        let detail = populated(try XCTUnwrap(menu.items[down + 1].submenu))
 
         XCTAssertNotNil(detail.items.first?.view, "sensor detail header view")
         let titles = detail.items.filter { !$0.isSeparatorItem && $0.view == nil }.map(\.title)
@@ -80,9 +80,26 @@ final class MenuBuilderTests: XCTestCase {
                 actions: RecordingActions()
             )
             let down = index(of: "DOWN", in: menu)
-            _ = try XCTUnwrap(menu.items[down + 1].submenu)
+            let detail = populated(try XCTUnwrap(menu.items[down + 1].submenu))
+            XCTAssertNotNil(detail.items.first?.view)
             XCTAssertEqual(!requested.isEmpty, expectedCalls, "showHistory \(showHistory)")
         }
+    }
+
+    func testSubmenusAreBuiltWhenOpened() throws {
+        var requested: [Int] = []
+        let menu = MenuBuilder.build(makeModel(), history: { requested.append($0); return nil },
+                                     actions: RecordingActions())
+        let detail = try XCTUnwrap(menu.items[index(of: "DOWN", in: menu) + 1].submenu)
+        let project = try XCTUnwrap(item("Shop", in: menu)?.submenu)
+
+        XCTAssertTrue(detail.items.isEmpty)
+        XCTAssertTrue(project.items.isEmpty)
+        XCTAssertTrue(requested.isEmpty)
+
+        XCTAssertFalse(populated(detail).items.isEmpty)
+        XCTAssertFalse(populated(project).items.isEmpty)
+        XCTAssertEqual(requested, [1])
     }
 
     func testNoMoreThanTwoSubmenuLevels() {
@@ -186,6 +203,11 @@ final class MenuBuilderTests: XCTestCase {
         menu.items.firstIndex { $0.title.hasPrefix(prefix) } ?? -1
     }
 
+    private func populated(_ menu: NSMenu) -> NSMenu {
+        menu.delegate?.menuNeedsUpdate?(menu)
+        return menu
+    }
+
     private func trigger(_ item: NSMenuItem) {
         guard let action = item.action else { return XCTFail("\(item.title) has no action") }
         _ = (item.target as? NSObject)?.perform(action, with: item)
@@ -197,7 +219,7 @@ final class MenuBuilderTests: XCTestCase {
         return menu.items
             .filter { $0.submenu != nil && !optionLists.contains($0.title) }
             .compactMap(\.submenu)
-            .map { 1 + depth(of: $0) }
+            .map { 1 + depth(of: populated($0)) }
             .max() ?? 0
     }
 }

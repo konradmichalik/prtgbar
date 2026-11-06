@@ -77,6 +77,31 @@ final class ClosureMenuItem: NSMenuItem {
     }
 }
 
+// MARK: - Lazy Menu
+
+/// Builds its items on first open, so a large tree does not pay for every submenu on each open.
+@MainActor
+final class LazyMenu: NSMenu, NSMenuDelegate {
+    private var populate: (@MainActor () -> [NSMenuItem])?
+
+    init(_ populate: @escaping @MainActor () -> [NSMenuItem]) {
+        self.populate = populate
+        super.init(title: "")
+        autoenablesItems = false
+        delegate = self
+    }
+
+    required init(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard let populate else { return }
+        self.populate = nil
+        items = populate()
+    }
+}
+
 // MARK: - Builder
 
 @MainActor
@@ -174,7 +199,7 @@ extension MenuBuilder.Context {
             trailing: row.since.map { formatDuration(now.timeIntervalSince($0)) }
         )
         item.image = (row.isAcknowledged ? MenuGlyph.acknowledged : MenuGlyph(status: row.status)).image
-        item.submenu = sensorDetailMenu(row)
+        item.submenu = LazyMenu { sensorDetailItems(row) }
         return item
     }
 
@@ -247,7 +272,7 @@ extension MenuBuilder.Context {
             trailing: counts
         )
         item.image = MenuGlyph(status: project.worstStatus).image
-        item.submenu = projectMenu(project)
+        item.submenu = LazyMenu { projectItems(project) }
         return item
     }
 
