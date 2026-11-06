@@ -13,28 +13,30 @@ struct MenuModel {
     let isConfigured: Bool
     let showHistory: Bool
 
-    static func make(
-        roots: [TreeNode],
-        timestamps: [Int: Date],
-        sort: ProblemSort,
-        serverURL: String,
-        lastUpdated: Date?,
-        error: String?,
-        actionError: String? = nil,
-        snoozedUntil: Date?,
-        showHistory: Bool = true
-    ) -> MenuModel {
+    struct Input {
+        var roots: [TreeNode] = []
+        var timestamps: [Int: Date] = [:]
+        var sort: ProblemSort = .newestFirst
+        var serverURL = ""
+        var lastUpdated: Date?
+        var error: String?
+        var actionError: String?
+        var snoozedUntil: Date?
+        var showHistory = true
+    }
+
+    static func make(_ input: Input) -> MenuModel {
         MenuModel(
-            serverHost: host(of: serverURL),
-            summary: summary(of: roots),
-            problems: ProblemList.make(from: roots, timestamps: timestamps, sort: sort),
-            projects: ProjectBuilder.projects(from: roots),
-            lastUpdated: lastUpdated,
-            errorMessage: error,
-            actionError: actionError,
-            snoozedUntil: snoozedUntil,
-            isConfigured: !serverURL.isEmpty,
-            showHistory: showHistory
+            serverHost: host(of: input.serverURL),
+            summary: summary(of: input.roots),
+            problems: ProblemList.make(from: input.roots, timestamps: input.timestamps, sort: input.sort),
+            projects: ProjectBuilder.projects(from: input.roots),
+            lastUpdated: input.lastUpdated,
+            errorMessage: input.error,
+            actionError: input.actionError,
+            snoozedUntil: input.snoozedUntil,
+            isConfigured: !input.serverURL.isEmpty,
+            showHistory: input.showHistory
         )
     }
 

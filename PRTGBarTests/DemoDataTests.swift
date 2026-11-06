@@ -5,10 +5,9 @@ import XCTest
 final class DemoDataTests: XCTestCase {
 
     func testDemoDataCoversMenuCases() {
-        let model = MenuModel.make(
-            roots: DemoData.buildTree(), timestamps: DemoData.problemTimestamps, sort: .newestFirst,
-            serverURL: DemoData.serverURL, lastUpdated: nil, error: nil, snoozedUntil: nil
-        )
+        let model = MenuModel.make(MenuModel.Input(
+            roots: DemoData.buildTree(), timestamps: DemoData.problemTimestamps, serverURL: DemoData.serverURL
+        ))
 
         XCTAssertGreaterThanOrEqual(model.summary.down, 1)
         XCTAssertGreaterThanOrEqual(model.summary.warning, 1)

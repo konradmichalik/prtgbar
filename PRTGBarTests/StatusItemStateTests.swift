@@ -71,7 +71,9 @@ final class StatusItemStateTests: XCTestCase {
     private func makeModel(
         roots: [TreeNode], error: String? = nil, actionError: String? = nil, snoozedUntil: Date? = nil
     ) -> MenuModel {
-        MenuModel.make(roots: roots, timestamps: [:], sort: .newestFirst, serverURL: "prtg.example.com",
-                       lastUpdated: Date(), error: error, actionError: actionError, snoozedUntil: snoozedUntil)
+        MenuModel.make(MenuModel.Input(
+            roots: roots, serverURL: "prtg.example.com", lastUpdated: Date(),
+            error: error, actionError: actionError, snoozedUntil: snoozedUntil
+        ))
     }
 }

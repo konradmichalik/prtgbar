@@ -100,8 +100,7 @@ final class MenuBuilderTests: XCTestCase {
     }
 
     func testUnconfiguredShowsSetUpItem() {
-        let model = MenuModel.make(roots: [], timestamps: [:], sort: .newestFirst, serverURL: "",
-                                   lastUpdated: nil, error: nil, snoozedUntil: nil)
+        let model = MenuModel.make(MenuModel.Input())
         let menu = build(model)
 
         XCTAssertNotNil(item("Set up PRTG…", in: menu))
@@ -169,10 +168,10 @@ final class MenuBuilderTests: XCTestCase {
             TreeNode(id: 10, name: "Shop", kind: .group, status: .down, children: [web]),
             TreeNode(id: 20, name: "Office", kind: .group, status: .up, children: [nas]),
         ])
-        return MenuModel.make(roots: [probe], timestamps: [:], sort: .newestFirst,
-                              serverURL: "https://prtg.example.com", lastUpdated: Date(),
-                              error: error, actionError: actionError, snoozedUntil: snoozedUntil,
-                              showHistory: showHistory)
+        return MenuModel.make(MenuModel.Input(
+            roots: [probe], serverURL: "https://prtg.example.com", lastUpdated: Date(),
+            error: error, actionError: actionError, snoozedUntil: snoozedUntil, showHistory: showHistory
+        ))
     }
 
     private func build(_ model: MenuModel) -> NSMenu {

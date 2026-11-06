@@ -80,7 +80,6 @@ final class MenuModelTests: XCTestCase {
     // MARK: - Helpers
 
     private func makeModel(serverURL: String, roots: [TreeNode]) -> MenuModel {
-        MenuModel.make(roots: roots, timestamps: [:], sort: .newestFirst, serverURL: serverURL,
-                       lastUpdated: nil, error: nil, snoozedUntil: nil)
+        MenuModel.make(MenuModel.Input(roots: roots, serverURL: serverURL))
     }
 }

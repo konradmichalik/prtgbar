@@ -13,10 +13,7 @@ final class AppState: ObservableObject {
     @Published var actionError: String?
     @Published var lastUpdated: Date?
     @Published var isConfigured = false
-    @Published private(set) var menuModel = MenuModel.make(
-        roots: [], timestamps: [:], sort: .newestFirst, serverURL: "",
-        lastUpdated: nil, error: nil, snoozedUntil: nil
-    )
+    @Published private(set) var menuModel = MenuModel.make(MenuModel.Input())
 
     let history = StatusHistory(fileURL: DemoData.isEnabled ? nil : StatusHistory.defaultFileURL)
 
@@ -198,7 +195,7 @@ final class AppState: ObservableObject {
 
     func updateMenuModel(now: Date = Date()) {
         let snoozeEnd = Date(timeIntervalSince1970: snoozedUntil)
-        menuModel = MenuModel.make(
+        menuModel = MenuModel.make(MenuModel.Input(
             roots: treeNodes,
             timestamps: problemTimestamps,
             sort: ProblemSort(rawValue: problemSort) ?? .newestFirst,
@@ -208,7 +205,7 @@ final class AppState: ObservableObject {
             actionError: actionError,
             snoozedUntil: snoozeEnd > now ? snoozeEnd : nil,
             showHistory: showHistory
-        )
+        ))
     }
 
     private func recordHistory(_ states: [Int: SensorStatus]) {
