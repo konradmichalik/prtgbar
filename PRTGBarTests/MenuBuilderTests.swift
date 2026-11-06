@@ -186,7 +186,7 @@ final class MenuBuilderTests: XCTestCase {
             TreeNode(id: 20, name: "Office", kind: .group, status: .up, children: [nas]),
         ])
         return MenuModel.make(MenuModel.Input(
-            roots: [probe], serverURL: "https://prtg.example.com", lastUpdated: Date(),
+            roots: [probe], serverURL: "https://prtg.example.com", hasAPIKey: true, lastUpdated: Date(),
             error: error, actionError: actionError, snoozedUntil: snoozedUntil, showHistory: showHistory
         ))
     }

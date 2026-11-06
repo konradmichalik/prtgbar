@@ -38,6 +38,12 @@ final class MenuModelTests: XCTestCase {
         XCTAssertFalse(makeModel(serverURL: "", roots: []).isConfigured)
     }
 
+    func testConfiguredNeedsServerAndKey() {
+        XCTAssertFalse(MenuModel.make(MenuModel.Input(serverURL: "prtg.example.com", hasAPIKey: false)).isConfigured)
+        XCTAssertFalse(MenuModel.make(MenuModel.Input(serverURL: "", hasAPIKey: true)).isConfigured)
+        XCTAssertTrue(MenuModel.make(MenuModel.Input(serverURL: "prtg.example.com", hasAPIKey: true)).isConfigured)
+    }
+
     func testSummaryCountsUnacknowledgedSensorsOnly() {
         let sensors = [
             TreeNode(id: 1, name: "a", kind: .sensor, status: .up),

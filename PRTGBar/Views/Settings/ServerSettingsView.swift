@@ -14,9 +14,17 @@ struct ServerSettingsView: View {
         Form {
             Section("Server") {
                 TextField("Server URL", text: $serverURL, prompt: Text("prtg.example.com"))
-                    .onChange(of: serverURL) { _, newValue in appState.serverURL = newValue }
+                    .onChange(of: serverURL) { _, newValue in
+                        guard newValue != appState.serverURL else { return }
+                        appState.serverURL = newValue
+                        appState.credentialsDidChange()
+                    }
                 SecureField("API Key", text: $apiKey, prompt: Text("API token from PRTG"))
-                    .onChange(of: apiKey) { _, newValue in appState.apiKey = newValue }
+                    .onChange(of: apiKey) { _, newValue in
+                        guard newValue != appState.apiKey else { return }
+                        appState.apiKey = newValue
+                        appState.credentialsDidChange()
+                    }
                 testRow
                 if connectionStatus == .failed, let error = appState.lastError {
                     Text(error).font(.caption).foregroundStyle(.red)

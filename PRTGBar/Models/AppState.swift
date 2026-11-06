@@ -68,7 +68,6 @@ final class AppState: ObservableObject {
         if notifyOnDown || notifyOnWarning || notifyOnRecovery {
             requestNotificationPermission()
         }
-        updateMenuModel()
         startPolling()
     }
 
@@ -85,13 +84,15 @@ final class AppState: ObservableObject {
     // MARK: - Polling
 
     private var timerCancellable: AnyCancellable?
+    private var credentialsRestart: Task<Void, Never>?
     private var alertEngine = AlertEngine()
     private(set) var problemTimestamps: [Int: Date] = [:]
 
     func startPolling() {
         stopPolling()
-        guard !serverURL.isEmpty, !apiKey.isEmpty else { return }
-        isConfigured = true
+        updateMenuModel()
+        isConfigured = !serverURL.isEmpty && !apiKey.isEmpty
+        guard isConfigured else { return }
 
         Task { await refresh() }
 
@@ -106,6 +107,16 @@ final class AppState: ObservableObject {
     func stopPolling() {
         timerCancellable?.cancel()
         timerCancellable = nil
+    }
+
+    /// Settings store every keystroke, so polling restarts once typing pauses instead of per character.
+    func credentialsDidChange() {
+        credentialsRestart?.cancel()
+        credentialsRestart = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            self?.startPolling()
+        }
     }
 
     func refresh() async {
@@ -205,6 +216,7 @@ final class AppState: ObservableObject {
             timestamps: problemTimestamps,
             sort: ProblemSort(rawValue: problemSort) ?? .newestFirst,
             serverURL: DemoData.isEnabled ? DemoData.serverURL : serverURL,
+            hasAPIKey: DemoData.isEnabled || !apiKey.isEmpty,
             lastUpdated: lastUpdated,
             error: lastError,
             actionError: actionError,

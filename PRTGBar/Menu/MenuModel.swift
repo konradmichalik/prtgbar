@@ -18,6 +18,8 @@ struct MenuModel {
         var timestamps: [Int: Date] = [:]
         var sort: ProblemSort = .newestFirst
         var serverURL = ""
+        /// Only whether a key exists; the key itself never enters the model.
+        var hasAPIKey = false
         var lastUpdated: Date?
         var error: String?
         var actionError: String?
@@ -35,7 +37,7 @@ struct MenuModel {
             errorMessage: input.error,
             actionError: input.actionError,
             snoozedUntil: input.snoozedUntil,
-            isConfigured: !input.serverURL.isEmpty,
+            isConfigured: !input.serverURL.isEmpty && input.hasAPIKey,
             showHistory: input.showHistory
         )
     }
