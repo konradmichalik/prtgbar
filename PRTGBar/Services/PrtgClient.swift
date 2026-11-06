@@ -196,7 +196,6 @@ enum PrtgClient {
     enum WriteAction {
         case acknowledge(id: Int, message: String?)
         case pause(id: Int, minutes: Int?, message: String?)
-        case resume(id: Int)
     }
 
     static func acknowledgeAlarm(
@@ -221,16 +220,6 @@ enum PrtgClient {
         )
     }
 
-    static func resumeObject(
-        objectId: Int,
-        serverURL: String, token: String, acceptSelfSignedCerts: Bool = true
-    ) async throws {
-        try await perform(
-            .resume(id: objectId),
-            serverURL: serverURL, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts
-        )
-    }
-
     static func writeActionURL(_ action: WriteAction, serverURL: String, token: String) throws -> URL {
         let path: String
         var items: [URLQueryItem]
@@ -249,12 +238,6 @@ enum PrtgClient {
                 items.append(URLQueryItem(name: "action", value: "0"))
             }
             if let message { items.append(URLQueryItem(name: "pausemsg", value: message)) }
-        case .resume(let id):
-            path = "/api/pause.htm"
-            items = [
-                URLQueryItem(name: "id", value: "\(id)"),
-                URLQueryItem(name: "action", value: "1"),
-            ]
         }
         return try buildURL(serverURL: serverURL, path: path, token: token, queryItems: items)
     }

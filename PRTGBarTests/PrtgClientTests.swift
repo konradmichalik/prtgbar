@@ -178,12 +178,6 @@ final class PrtgClientTests: XCTestCase {
         XCTAssertEqual(query(c, "duration"), "60")
     }
 
-    func testResumeURL() throws {
-        let c = try writeURL(.resume(id: 42))
-        XCTAssertEqual(c.path, "/api/pause.htm")
-        XCTAssertEqual(query(c, "action"), "1")
-    }
-
     func testPauseMessageOmittedWhenNil() throws {
         let c = try writeURL(.pause(id: 42, minutes: nil, message: nil))
         XCTAssertNil(query(c, "pausemsg"))
