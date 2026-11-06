@@ -2,19 +2,22 @@ import UserNotifications
 
 enum NotificationDispatcher {
     static let categoryId = "SENSOR_ALERT"
+    static let warningCategoryId = "SENSOR_WARNING"
     static let acknowledgeAction = "ACKNOWLEDGE"
     static let openAction = "OPEN"
 
+    /// PRTG only acknowledges sensors in a down state, so warnings offer Open alone.
+    static var categories: Set<UNNotificationCategory> {
+        let acknowledge = UNNotificationAction(identifier: acknowledgeAction, title: "Acknowledge")
+        let open = UNNotificationAction(identifier: openAction, title: "Open in PRTG", options: .foreground)
+        return [
+            UNNotificationCategory(identifier: categoryId, actions: [acknowledge, open], intentIdentifiers: []),
+            UNNotificationCategory(identifier: warningCategoryId, actions: [open], intentIdentifiers: []),
+        ]
+    }
+
     static func registerCategories(center: UNUserNotificationCenter) {
-        let category = UNNotificationCategory(
-            identifier: categoryId,
-            actions: [
-                UNNotificationAction(identifier: acknowledgeAction, title: "Acknowledge"),
-                UNNotificationAction(identifier: openAction, title: "Open", options: .foreground)
-            ],
-            intentIdentifiers: []
-        )
-        center.setNotificationCategories([category])
+        center.setNotificationCategories(categories)
     }
 
     static func content(for alert: Alert, soundEnabled: Bool) -> UNMutableNotificationContent {
@@ -25,7 +28,11 @@ enum NotificationDispatcher {
         content.userInfo = ["sensorIds": alert.sensorIds, "deviceId": alert.deviceId]
         content.interruptionLevel = alert.kind == .recovery ? .passive : .active
         if alert.playSound && soundEnabled { content.sound = .default }
-        if alert.kind != .recovery && alert.kind != .flapping { content.categoryIdentifier = categoryId }
+        switch alert.kind {
+        case .down, .reminder: content.categoryIdentifier = categoryId
+        case .warning: content.categoryIdentifier = warningCategoryId
+        case .recovery, .flapping: break
+        }
         return content
     }
 

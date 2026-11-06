@@ -71,6 +71,14 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(actions.paused.map(\.minutes), [60, nil])
     }
 
+    func testWarningSensorDetailHasNoAcknowledge() throws {
+        let menu = build(makeModel())
+        let detail = populated(try XCTUnwrap(menu.items[index(of: "WARNING", in: menu) + 1].submenu))
+        let titles = detail.items.filter { !$0.isSeparatorItem && $0.view == nil }.map(\.title)
+
+        XCTAssertEqual(titles, ["Pause", "Open in PRTG", "Copy Sensor Name", "Copy Sensor ID"])
+    }
+
     func testSensorDetailOmitsHistoryWhenDisabled() throws {
         for (showHistory, expectedCalls) in [(true, true), (false, false)] {
             var requested: [Int] = []

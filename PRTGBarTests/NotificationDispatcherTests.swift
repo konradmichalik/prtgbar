@@ -32,7 +32,21 @@ final class NotificationDispatcherTests: XCTestCase {
     func testThreadIdentifierPerDevice() {
         let content = NotificationDispatcher.content(for: alert(.warning), soundEnabled: true)
         XCTAssertEqual(content.threadIdentifier, "device-7")
-        XCTAssertEqual(content.categoryIdentifier, NotificationDispatcher.categoryId)
+    }
+
+    func testOnlyDownAlertsOfferAcknowledge() {
+        let down = NotificationDispatcher.content(for: alert(.down), soundEnabled: true)
+        let reminder = NotificationDispatcher.content(for: alert(.reminder), soundEnabled: true)
+        let warning = NotificationDispatcher.content(for: alert(.warning), soundEnabled: true)
+        XCTAssertEqual(down.categoryIdentifier, NotificationDispatcher.categoryId)
+        XCTAssertEqual(reminder.categoryIdentifier, NotificationDispatcher.categoryId)
+        XCTAssertEqual(warning.categoryIdentifier, NotificationDispatcher.warningCategoryId)
+
+        let actions = Dictionary(uniqueKeysWithValues: NotificationDispatcher.categories.map {
+            ($0.identifier, $0.actions.map(\.title))
+        })
+        XCTAssertEqual(actions[NotificationDispatcher.categoryId], ["Acknowledge", "Open in PRTG"])
+        XCTAssertEqual(actions[NotificationDispatcher.warningCategoryId], ["Open in PRTG"])
     }
 
     func testRecoveryHasNoActionsCategory() {

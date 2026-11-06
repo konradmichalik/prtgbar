@@ -34,7 +34,8 @@ extension MenuBuilder.Context {
         )
         let pause = NSMenuItem(title: "Pause", action: nil, keyEquivalent: "")
         pause.submenu = pauseMenu(objectId: row.id)
-        let acknowledge = row.isAcknowledged ? [] : [action("Acknowledge…") { $0.acknowledge(sensorIds: [row.id]) }]
+        let canAcknowledge = !row.isAcknowledged && (row.status == .down || row.status == .partialdown)
+        let acknowledge = canAcknowledge ? [action("Acknowledge…") { $0.acknowledge(sensorIds: [row.id]) }] : []
         return [headerItem(header), .separator()] + acknowledge + [
             pause,
             .separator(),
