@@ -71,6 +71,20 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(actions.paused.map(\.minutes), [60, nil])
     }
 
+    func testSensorDetailOmitsHistoryWhenDisabled() throws {
+        for (showHistory, expectedCalls) in [(true, true), (false, false)] {
+            var requested: [Int] = []
+            let menu = MenuBuilder.build(
+                makeModel(showHistory: showHistory),
+                history: { requested.append($0); return nil },
+                actions: RecordingActions()
+            )
+            let down = index(of: "DOWN", in: menu)
+            _ = try XCTUnwrap(menu.items[down + 1].submenu)
+            XCTAssertEqual(!requested.isEmpty, expectedCalls, "showHistory \(showHistory)")
+        }
+    }
+
     func testNoMoreThanTwoSubmenuLevels() {
         let menu = build(makeModel())
         XCTAssertLessThanOrEqual(depth(of: menu), 2)
@@ -139,7 +153,8 @@ final class MenuBuilderTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeModel(error: String? = nil, actionError: String? = nil, snoozedUntil: Date? = nil) -> MenuModel {
+    private func makeModel(error: String? = nil, actionError: String? = nil, snoozedUntil: Date? = nil,
+                           showHistory: Bool = true) -> MenuModel {
         let web = TreeNode(id: 100, name: "web-01", kind: .device, status: .down, children: [
             TreeNode(id: 1, name: "HTTP", kind: .sensor, status: .down, message: "Timeout"),
             TreeNode(id: 2, name: "Disk Free", kind: .sensor, status: .warning),
@@ -156,7 +171,8 @@ final class MenuBuilderTests: XCTestCase {
         ])
         return MenuModel.make(roots: [probe], timestamps: [:], sort: .newestFirst,
                               serverURL: "https://prtg.example.com", lastUpdated: Date(),
-                              error: error, actionError: actionError, snoozedUntil: snoozedUntil)
+                              error: error, actionError: actionError, snoozedUntil: snoozedUntil,
+                              showHistory: showHistory)
     }
 
     private func build(_ model: MenuModel) -> NSMenu {

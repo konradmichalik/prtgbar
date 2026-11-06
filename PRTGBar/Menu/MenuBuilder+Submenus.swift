@@ -29,7 +29,7 @@ extension MenuBuilder.Context {
             statusLine: statusLine(row),
             statusColor: MenuGlyph(status: row.status).color,
             message: row.message,
-            history: history(row.id),
+            history: model.showHistory ? history(row.id) : nil,
             breadcrumb: row.breadcrumb
         )
         let pause = NSMenuItem(title: "Pause", action: nil, keyEquivalent: "")

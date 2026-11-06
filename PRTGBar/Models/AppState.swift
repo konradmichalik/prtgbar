@@ -24,16 +24,20 @@ final class AppState: ObservableObject {
 
     @AppStorage("serverURL") var serverURL = ""
     @AppStorage("refreshInterval") var refreshInterval: Double = 60
-    @AppStorage("notifyOnStatusChange") var notifyOnStatusChange = true
     @AppStorage("notificationSound") var notificationSound = true
     @AppStorage("notifyOnDown") var notifyOnDown = true
     @AppStorage("notifyOnWarning") var notifyOnWarning = false
     @AppStorage("showBadgeCount") var showBadgeCount = true
     @AppStorage("acceptSelfSignedCerts") var acceptSelfSignedCerts = true
-    @AppStorage("showAllProbes") var showAllProbes = true
-    @AppStorage("showAcknowledged") var showAcknowledged = false
     @AppStorage("showWarningIndicator") var showWarningIndicator = false
     @AppStorage("problemSort") var problemSort = ProblemSort.newestFirst.rawValue
+    @AppStorage("showHistory") var showHistory = true
+    @AppStorage("notifyOnRecovery") var notifyOnRecovery = true
+    @AppStorage("alertExtraChecks") var alertExtraChecks = 1
+    @AppStorage("combineAlerts") var combineAlerts = CombineMode.perDevice.rawValue
+    @AppStorage("muteFlapping") var muteFlapping = true
+    @AppStorage("skipAcknowledgedAndPaused") var skipAcknowledgedAndPaused = true
+    @AppStorage("reminderInterval") var reminderInterval: Double = 0
     @AppStorage("snoozedUntil") var snoozedUntil: Double = 0
 
     // MARK: - API Key (Keychain)
@@ -53,12 +57,13 @@ final class AppState: ObservableObject {
     // MARK: - Lifecycle
 
     func onLaunch() {
+        SettingsMigration.run(.standard)
         try? history.load()
         if DemoData.isEnabled {
             loadDemoData()
             return
         }
-        if notifyOnStatusChange {
+        if notifyOnDown || notifyOnWarning || notifyOnRecovery {
             requestNotificationPermission()
         }
         updateMenuModel()
@@ -200,7 +205,8 @@ final class AppState: ObservableObject {
             lastUpdated: lastUpdated,
             error: lastError,
             actionError: actionError,
-            snoozedUntil: snoozeEnd > now ? snoozeEnd : nil
+            snoozedUntil: snoozeEnd > now ? snoozeEnd : nil,
+            showHistory: showHistory
         )
     }
 
@@ -246,12 +252,16 @@ final class AppState: ObservableObject {
         problemTimestamps = timestamps
     }
 
-    /// Temporary mapping of the legacy settings; the alert settings pane replaces it.
     private func makeAlertConfig(now: Date) -> AlertConfig {
         var config = AlertConfig()
-        config.alertOnDown = notifyOnStatusChange && notifyOnDown
-        config.alertOnWarning = notifyOnStatusChange && notifyOnWarning
-        config.alertOnRecovery = notifyOnStatusChange
+        config.alertOnDown = notifyOnDown
+        config.alertOnWarning = notifyOnWarning
+        config.alertOnRecovery = notifyOnRecovery
+        config.extraChecks = alertExtraChecks
+        config.combine = CombineMode(rawValue: combineAlerts) ?? .perDevice
+        config.muteFlapping = muteFlapping
+        config.skipAcknowledgedAndPaused = skipAcknowledgedAndPaused
+        config.reminderInterval = reminderInterval > 0 ? reminderInterval : nil
         let snoozeEnd = Date(timeIntervalSince1970: snoozedUntil)
         config.snoozedUntil = snoozedUntil > 0 && snoozeEnd > now ? snoozeEnd : nil
         return config

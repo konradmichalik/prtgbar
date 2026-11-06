@@ -11,6 +11,7 @@ struct MenuModel {
     let actionError: String?
     let snoozedUntil: Date?
     let isConfigured: Bool
+    let showHistory: Bool
 
     static func make(
         roots: [TreeNode],
@@ -20,7 +21,8 @@ struct MenuModel {
         lastUpdated: Date?,
         error: String?,
         actionError: String? = nil,
-        snoozedUntil: Date?
+        snoozedUntil: Date?,
+        showHistory: Bool = true
     ) -> MenuModel {
         MenuModel(
             serverHost: host(of: serverURL),
@@ -31,7 +33,8 @@ struct MenuModel {
             errorMessage: error,
             actionError: actionError,
             snoozedUntil: snoozedUntil,
-            isConfigured: !serverURL.isEmpty
+            isConfigured: !serverURL.isEmpty,
+            showHistory: showHistory
         )
     }
 

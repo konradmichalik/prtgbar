@@ -14,7 +14,7 @@ struct AboutView: View {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(height: 48)
+                .frame(height: 64)
 
             Text("PRTGBar")
                 .font(.headline)
@@ -22,6 +22,8 @@ struct AboutView: View {
             Text("Version \(appVersion)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+
+            updateCheckSection
 
             Button {
                 if let url = URL(string: "https://github.com/konradmichalik/prtgbar") {
@@ -31,8 +33,6 @@ struct AboutView: View {
                 Label("GitHub Repository", systemImage: "link")
             }
             .buttonStyle(.bordered)
-
-            updateCheckSection
 
             Text("\u{00A9} 2026 Konrad Michalik")
                 .font(.caption)
