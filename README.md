@@ -29,7 +29,7 @@ PRTGBar sits in your macOS menu bar and shows all down and warning sensors from 
 - **Sensor details** with a 24 h history strip, uptime ratio and outage count, kept locally
 - **Menu bar badge** with the live count of down sensors, optionally a warning indicator
 - **Calm notifications** grouped per device or group, with a wait before alerting, flapping mute, reminders and recovery messages
-- **Acknowledge and Open** straight from the notification, and acknowledge or pause sensors from the menu
+- **Acknowledge and Open in PRTG** straight from a down notification, and acknowledge or pause sensors from the menu
 - **Snooze** notifications for one hour or until 08:00
 - **Self-signed SSL** works with PRTG instances behind private certificates
 - **Keychain storage** keeps the API key in the macOS Keychain

@@ -53,27 +53,29 @@ make lint
 PRTGBar/
 ├── PRTGBarApp.swift              Entry point, settings scene, status item owner
 ├── Menu/
-│   ├── StatusItemController.swift  NSStatusItem, menu actions, refresh of the open menu
+│   ├── StatusItemController.swift  NSStatusItem, menu actions, rebuild on open
 │   ├── StatusItemState.swift       Icon and badge state from the menu model
 │   ├── MenuModel.swift             Immutable snapshot the menu is built from
-│   ├── MenuBuilder.swift           Native NSMenu: problems, projects, footer
+│   ├── MenuBuilder.swift           Native NSMenu: problems, projects, footer, lazy submenus
 │   ├── MenuBuilder+Submenus.swift  Sensor, project, acknowledged and snooze submenus
 │   ├── MenuHeaderViews.swift       Custom header views inside the menu
 │   └── MenuText.swift              Shared menu copy and truncation
 ├── Notifications/
 │   ├── AlertEngine.swift           Decides which alerts fire (wait, combine, flapping, reminders)
 │   ├── AlertEngine+State.swift     Per-sensor tracking state
-│   └── NotificationDispatcher.swift  Notification content and Acknowledge/Open actions
+│   └── NotificationDispatcher.swift  Notification content and Acknowledge/Open in PRTG actions
 ├── Models/
 │   ├── AppState.swift              @MainActor observable, polling, settings, actions
+│   ├── AppState+Opening.swift      Opens objects in the PRTG web UI
 │   ├── PrtgData.swift              DTOs, TreeNode, TreeBuilder, ProblemItem
 │   ├── Project.swift               Projects, devices and subgroups from the tree
 │   ├── ProblemList.swift           Sorted problems, acknowledged and paused lines
-│   ├── StatusHistory.swift         Local 24 h history behind the strip
+│   ├── StatusHistory.swift         Local 24 h history behind the strip, one up/down flag pair per 30 min
 │   ├── SettingsMigration.swift     Migrates settings from older versions
 │   └── DemoData.swift              Demo tree and history for `--demo`
 ├── Services/
 │   ├── PrtgClient.swift            Async v1 API client, dual SSL sessions
+│   ├── PrtgClient+WriteActions.swift  Acknowledge and pause
 │   └── KeychainService.swift       Thin Security framework wrapper
 └── Views/
     ├── SettingsView.swift          Tab container for the settings
