@@ -7,6 +7,7 @@ enum PrtgClientError: LocalizedError {
     case networkError(Error)
     case decodingError(Error)
     case readOnly
+    case partiallyAcknowledged(failed: Int, total: Int)
 
     var errorDescription: String? {
         switch self {
@@ -16,6 +17,7 @@ enum PrtgClientError: LocalizedError {
         case .networkError(let error): "Network error: \(error.localizedDescription)"
         case .decodingError(let error): "Failed to parse response: \(error.localizedDescription)"
         case .readOnly: "This API key is read-only or lacks permission for this action."
+        case .partiallyAcknowledged(let failed, let total): "\(failed) of \(total) sensors could not be acknowledged."
         }
     }
 }

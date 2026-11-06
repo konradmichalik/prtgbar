@@ -203,4 +203,32 @@ final class PrtgClientTests: XCTestCase {
             return XCTFail("other errors stay unchanged")
         }
     }
+
+    // MARK: - Grouped Acknowledge
+
+    func testAckOutcomeAllSucceeded() {
+        XCTAssertNil(PrtgClient.ackOutcome([.success(()), .success(())]))
+    }
+
+    func testAckOutcomeAllReadOnly() {
+        guard case .readOnly = PrtgClient.ackOutcome([.failure(.readOnly), .failure(.readOnly)]) else {
+            return XCTFail("all read-only failures should report readOnly")
+        }
+    }
+
+    func testAckOutcomeSomeFailed() {
+        let error = PrtgClient.ackOutcome([.success(()), .failure(.serverError(500)), .failure(.readOnly)])
+        XCTAssertEqual(error?.errorDescription, "2 of 3 sensors could not be acknowledged.")
+    }
+
+    func testAckOutcomeAllFailedForOtherReasons() {
+        let error = PrtgClient.ackOutcome([.failure(.serverError(500)), .failure(.readOnly)])
+        XCTAssertEqual(error?.errorDescription, "2 of 2 sensors could not be acknowledged.")
+    }
+
+    func testAckOutcomeSingleFailureKeepsItsError() {
+        guard case .serverError(500) = PrtgClient.ackOutcome([.failure(.serverError(500))]) else {
+            return XCTFail("a single sensor reports its own error")
+        }
+    }
 }

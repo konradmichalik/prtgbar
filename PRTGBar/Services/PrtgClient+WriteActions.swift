@@ -10,12 +10,36 @@ extension PrtgClient {
         objectIds: [Int], message: String?,
         serverURL: String, token: String, acceptSelfSignedCerts: Bool = true
     ) async throws {
+        var results: [Result<Void, PrtgClientError>] = []
         for id in objectIds {
-            try await perform(
-                .acknowledge(id: id, message: message),
-                serverURL: serverURL, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts
-            )
+            do {
+                try await perform(
+                    .acknowledge(id: id, message: message),
+                    serverURL: serverURL, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts
+                )
+                results.append(.success(()))
+            } catch let error as PrtgClientError {
+                results.append(.failure(error))
+            } catch {
+                results.append(.failure(.networkError(error)))
+            }
         }
+        if let error = ackOutcome(results) { throw error }
+    }
+
+    /// One failing sensor must not keep the rest of a grouped notification unacknowledged.
+    static func ackOutcome(_ results: [Result<Void, PrtgClientError>]) -> PrtgClientError? {
+        let failures = results.compactMap { result -> PrtgClientError? in
+            if case .failure(let error) = result { return error }
+            return nil
+        }
+        guard let first = failures.first else { return nil }
+        if failures.count == results.count {
+            let allReadOnly = failures.allSatisfy { if case .readOnly = $0 { true } else { false } }
+            if allReadOnly { return .readOnly }
+            if results.count == 1 { return first }
+        }
+        return .partiallyAcknowledged(failed: failures.count, total: results.count)
     }
 
     static func pauseObject(
