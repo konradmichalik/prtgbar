@@ -1,6 +1,6 @@
 import Foundation
 
-enum StatusClass: Equatable, Sendable {
+enum StatusClass: Int, Comparable, Sendable {
     case ok, warning, down
 
     init(_ status: SensorStatus) {
@@ -9,6 +9,10 @@ enum StatusClass: Equatable, Sendable {
         case .warning, .unusual: self = .warning
         case .up, .paused, .unknown: self = .ok
         }
+    }
+
+    static func < (lhs: StatusClass, rhs: StatusClass) -> Bool {
+        lhs.rawValue < rhs.rawValue
     }
 }
 
@@ -21,38 +25,45 @@ enum SensorEvent: Equatable, Sendable {
 
 struct SensorObservation: Sendable {
     let effectiveClass: StatusClass
-    let rawClass: StatusClass
+    let status: SensorStatus
     let isAcknowledged: Bool
     let now: Date
 }
 
+/// A problem span runs from leaving ok-class until the sensor is ok-class again,
+/// so down and warning changes inside one outage share their alerts.
 struct SensorAlertState: Equatable, Sendable {
     var lastClass: StatusClass
     var streak = 1
+    /// Highest class already alerted, or known at baseline, in the current span.
+    var covered: StatusClass
     var alerted = false
-    /// Episodes already in progress at baseline or when flapping settles never alert.
-    var known: Bool
     var changeTimes: [Date] = []
     var lastChange: Date
     var flappingSince: Date?
-    /// Time of the episode's alert or its latest reminder.
+    /// Time of the span's down alert or its latest reminder.
     var lastReminder: Date?
 
     static func baseline(_ statusClass: StatusClass, at now: Date) -> SensorAlertState {
-        SensorAlertState(lastClass: statusClass, known: statusClass != .ok, lastChange: now)
+        SensorAlertState(lastClass: statusClass, covered: statusClass, lastChange: now)
     }
 
     func advancing(with observation: SensorObservation, config: AlertConfig) -> (SensorAlertState, SensorEvent?) {
         let changed = observation.effectiveClass != lastClass
-        let observed = observing(observation, config: config)
-        if let flapResult = observed.flapTransition(changed: changed, now: observation.now, config: config) {
-            return flapResult
+        var next = observing(observation, config: config)
+        if next.flappingSince != nil {
+            guard observation.now.timeIntervalSince(next.lastChange) >= config.flapCalm else { return (next, nil) }
+            next = next.settled()
+        } else if config.muteFlapping, changed, next.changeTimes.count >= config.flapThreshold {
+            next = next.resettingSpan()
+            next.flappingSince = observation.now
+            return (next, .flapping(changes: next.changeTimes.count))
         }
-        if changed, alerted, observation.effectiveClass == .ok {
-            let recovers = config.alertOnRecovery && observation.rawClass == .ok
-            return (observed, recovers ? .recovery : nil)
+        if changed, observation.effectiveClass == .ok {
+            let recovers = next.alerted && config.alertOnRecovery && observation.status == .up
+            return (next.resettingSpan(), recovers ? .recovery : nil)
         }
-        return observed.alertTransition(observation, config: config)
+        return next.alertTransition(observation, config: config)
     }
 
     private func observing(_ observation: SensorObservation, config: AlertConfig) -> SensorAlertState {
@@ -61,10 +72,7 @@ struct SensorAlertState: Equatable, Sendable {
         if observation.effectiveClass != lastClass {
             next.lastClass = observation.effectiveClass
             next.streak = 1
-            next.alerted = false
-            next.known = false
             next.lastChange = now
-            next.lastReminder = nil
             next.changeTimes.append(now)
         } else {
             next.streak += 1
@@ -73,33 +81,35 @@ struct SensorAlertState: Equatable, Sendable {
         return next
     }
 
-    /// Returns nil when flapping does not apply and normal alerting continues.
-    private func flapTransition(changed: Bool, now: Date, config: AlertConfig) -> (SensorAlertState, SensorEvent?)? {
+    private func resettingSpan() -> SensorAlertState {
         var next = self
-        if flappingSince != nil {
-            if now.timeIntervalSince(lastChange) >= config.flapCalm {
-                next.flappingSince = nil
-                next.changeTimes = []
-                next.known = lastClass != .ok
-            }
-            return (next, nil)
-        }
-        guard config.muteFlapping, changed, changeTimes.count >= config.flapThreshold else { return nil }
-        next.flappingSince = now
-        return (next, .flapping(changes: changeTimes.count))
+        next.covered = .ok
+        next.alerted = false
+        next.lastReminder = nil
+        return next
+    }
+
+    /// A sensor that calms down starts a fresh span in its current class.
+    private func settled() -> SensorAlertState {
+        var next = resettingSpan()
+        next.flappingSince = nil
+        next.changeTimes = []
+        next.streak = 1
+        return next
     }
 
     private func alertTransition(_ observation: SensorObservation, config: AlertConfig) -> (SensorAlertState, SensorEvent?) {
         var next = self
         let statusClass = observation.effectiveClass
         let now = observation.now
-        if statusClass != .ok, !known, !alerted, streak >= config.extraChecks + 1 {
+        if statusClass > covered, streak >= config.extraChecks + 1 {
             guard config.alertsEnabled(for: statusClass) else { return (next, nil) }
+            next.covered = statusClass
             next.alerted = true
-            next.lastReminder = now
+            if statusClass == .down { next.lastReminder = now }
             return (next, .problem(statusClass))
         }
-        guard statusClass == .down, alerted, !observation.isAcknowledged,
+        guard statusClass == .down, covered == .down, alerted, !observation.isAcknowledged,
               let interval = config.reminderInterval, let last = lastReminder,
               now.timeIntervalSince(last) >= interval else {
             return (next, nil)

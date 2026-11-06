@@ -78,7 +78,7 @@ struct AlertEngine: Sendable {
     private func observe(_ sensor: SensorSnapshot, at now: Date) -> SensorObservation {
         let rawClass = StatusClass(sensor.status)
         let skipped = config.skipAcknowledgedAndPaused && sensor.isAcknowledged
-        return SensorObservation(effectiveClass: skipped ? .ok : rawClass, rawClass: rawClass,
+        return SensorObservation(effectiveClass: skipped ? .ok : rawClass, status: sensor.status,
                                  isAcknowledged: sensor.isAcknowledged, now: now)
     }
 

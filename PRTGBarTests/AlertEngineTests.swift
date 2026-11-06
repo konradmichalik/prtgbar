@@ -114,13 +114,116 @@ final class AlertEngineTests: XCTestCase {
     func testFlappingEndsAfterCalmPeriod() {
         var sut = engine { $0.extraChecks = 0 }
         _ = sut.process([snap(1, .up)], at: at(0))
+        for minute in 1...12 {
+            _ = sut.process([snap(1, minute % 2 == 1 ? .down : .up)], at: at(Double(minute)))
+        }
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(20)), [])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(27)), [])
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(28)).map(\.kind), [.down])
+    }
+
+    func testFlapSettlingInDownAlertsOnce() {
+        var sut = engine { $0.reminderInterval = 1800 }
+        _ = sut.process([snap(1, .up)], at: at(0))
         for minute in 1...13 {
             _ = sut.process([snap(1, minute % 2 == 1 ? .down : .up)], at: at(Double(minute)))
         }
         XCTAssertEqual(sut.process([snap(1, .down)], at: at(20)), [])
         XCTAssertEqual(sut.process([snap(1, .down)], at: at(28)), [])
-        XCTAssertEqual(sut.process([snap(1, .up)], at: at(29)), [])
-        XCTAssertEqual(sut.process([snap(1, .down)], at: at(30)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(29)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(30)), [])
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(59)).map(\.kind), [.reminder])
+    }
+
+    func testPausedEndsEpisodeWithoutRecovery() {
+        var sut = engine { $0.extraChecks = 0 }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(1)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .paused)], at: at(2)), [])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(3)), [])
+    }
+
+    func testUnknownEndsEpisodeWithoutRecovery() {
+        var sut = engine { $0.extraChecks = 0 }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(1)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .unknown)], at: at(2)), [])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(3)), [])
+    }
+
+    func testDownThenWarningThenUpRecoversOnce() {
+        var sut = engine { $0.extraChecks = 0; $0.alertOnWarning = true }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(1)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .warning)], at: at(2)), [])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(3)).map(\.kind), [.recovery])
+    }
+
+    func testDownWarningDownAlertsOnce() {
+        var sut = engine { $0.alertOnWarning = true }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        var kinds: [AlertKind] = []
+        for (minute, status) in [SensorStatus.down, .down, .warning, .warning, .down, .down].enumerated() {
+            kinds += sut.process([snap(1, status)], at: at(Double(minute + 1))).map(\.kind)
+        }
+        XCTAssertEqual(kinds, [.down])
+    }
+
+    func testWarningEscalatingToDownAlertsDown() {
+        var sut = engine { $0.extraChecks = 0; $0.alertOnWarning = true }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .warning)], at: at(1)).map(\.kind), [.warning])
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(2)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(3)).map(\.kind), [.recovery])
+    }
+
+    func testAcknowledgeEndsEpisodeWithoutRecovery() {
+        var sut = engine { $0.extraChecks = 0 }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(1)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .down, ack: true)], at: at(2)), [])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(3)), [])
+    }
+
+    func testUnacknowledgeWhileDownAlertsAgain() {
+        var sut = engine { $0.extraChecks = 0 }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(1)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .down, ack: true)], at: at(2)), [])
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(3)).map(\.kind), [.down])
+    }
+
+    func testSensorFirstSeenAfterBaselineIsKnown() {
+        var sut = engine { $0.extraChecks = 0 }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .up), snap(2, .down)], at: at(1)), [])
+        XCTAssertEqual(sut.process([snap(1, .up), snap(2, .down)], at: at(2)), [])
+        XCTAssertEqual(sut.process([snap(1, .up), snap(2, .up)], at: at(3)), [])
+        XCTAssertEqual(sut.process([snap(1, .up), snap(2, .down)], at: at(4)).map(\.sensorIds), [[2]])
+    }
+
+    func testCombineNeverAlertsPerSensor() {
+        var sut = engine { $0.extraChecks = 0; $0.combine = .never }
+        _ = sut.process([snap(1, .up), snap(2, .up)], at: at(0))
+        let alerts = sut.process([snap(2, .down), snap(1, .down)], at: at(1))
+        XCTAssertEqual(alerts.map(\.title), ["web-01: Sensor 1 is down", "web-01: Sensor 2 is down"])
+        XCTAssertEqual(alerts.map(\.threadId), ["device-100", "device-100"])
+    }
+
+    func testNoRecoveryWhenDisabled() {
+        var sut = engine { $0.extraChecks = 0; $0.alertOnRecovery = false }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .down)], at: at(1)).map(\.kind), [.down])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(2)), [])
+    }
+
+    func testGroupedRecoveryCopy() {
+        var sut = engine { $0.extraChecks = 0 }
+        _ = sut.process([snap(1, .up), snap(2, .up)], at: at(0))
+        _ = sut.process([snap(1, .down), snap(2, .down)], at: at(1))
+        let alerts = sut.process([snap(1, .up), snap(2, .up)], at: at(2))
+        XCTAssertEqual(alerts, [Alert(kind: .recovery, title: "web-01: 2 sensors OK again", body: "Sensor 1, Sensor 2",
+                                      sensorIds: [1, 2], deviceId: 100, threadId: "device-100", playSound: false)])
     }
 
     func testReminderRepeats() {
