@@ -151,4 +151,62 @@ final class PrtgClientTests: XCTestCase {
             XCTAssertFalse(status.symbolName.isEmpty, "\(status) should have a symbol name")
         }
     }
+
+    // MARK: - Write Actions
+
+    private func writeURL(_ action: PrtgClient.WriteAction) throws -> URLComponents {
+        let url = try PrtgClient.writeActionURL(action, serverURL: "prtg.example.com", token: "tok")
+        return try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+    }
+
+    private func query(_ components: URLComponents, _ name: String) -> String? {
+        components.queryItems?.first { $0.name == name }?.value
+    }
+
+    func testPauseIndefinitelyURL() throws {
+        let c = try writeURL(.pause(id: 42, minutes: nil, message: nil))
+        XCTAssertEqual(c.path, "/api/pause.htm")
+        XCTAssertEqual(query(c, "id"), "42")
+        XCTAssertEqual(query(c, "action"), "0")
+        XCTAssertEqual(query(c, "apitoken"), "tok")
+    }
+
+    func testPauseForMinutesURL() throws {
+        let c = try writeURL(.pause(id: 42, minutes: 60, message: nil))
+        XCTAssertEqual(c.path, "/api/pauseobjectfor.htm")
+        XCTAssertEqual(query(c, "id"), "42")
+        XCTAssertEqual(query(c, "duration"), "60")
+    }
+
+    func testResumeURL() throws {
+        let c = try writeURL(.resume(id: 42))
+        XCTAssertEqual(c.path, "/api/pause.htm")
+        XCTAssertEqual(query(c, "action"), "1")
+    }
+
+    func testPauseMessageOmittedWhenNil() throws {
+        let c = try writeURL(.pause(id: 42, minutes: nil, message: nil))
+        XCTAssertNil(query(c, "pausemsg"))
+        let withMsg = try writeURL(.pause(id: 42, minutes: nil, message: "maintenance"))
+        XCTAssertEqual(query(withMsg, "pausemsg"), "maintenance")
+    }
+
+    func testAcknowledgeURLOmitsMessageWhenNil() throws {
+        let c = try writeURL(.acknowledge(id: 7, message: nil))
+        XCTAssertEqual(c.path, "/api/acknowledgealarm.htm")
+        XCTAssertNil(query(c, "ackmsg"))
+    }
+
+    func testWriteActionMapsForbiddenToReadOnlyMessage() {
+        guard case .readOnly = PrtgClient.mapWriteError(.unauthorized) else {
+            return XCTFail("unauthorized should map to readOnly")
+        }
+        XCTAssertEqual(
+            PrtgClientError.readOnly.errorDescription,
+            "This API key is read-only or lacks permission for this action."
+        )
+        guard case .serverError(500) = PrtgClient.mapWriteError(.serverError(500)) else {
+            return XCTFail("other errors stay unchanged")
+        }
+    }
 }

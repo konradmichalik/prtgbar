@@ -150,7 +150,7 @@ final class AppState: ObservableObject {
         do {
             try await Task.detached { [serverURL, apiKey, acceptSelfSignedCerts] in
                 try await PrtgClient.acknowledgeAlarm(
-                    objectId: objectId,
+                    objectIds: [objectId], message: nil,
                     serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
                 )
             }.value
