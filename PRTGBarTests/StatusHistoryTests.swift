@@ -65,14 +65,44 @@ final class StatusHistoryTests: XCTestCase {
         XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .up)
     }
 
-    func testPrunesOlderThan24h() {
+    func testRecordPrunesOlderThan24h() {
         let history = StatusHistory(fileURL: nil)
         history.record([1: .down], at: ago(25 * 3600))
         history.record([1: .up], at: now)
-        let summary = history.summary(for: 1, now: now)
-        XCTAssertEqual(summary.outageCount, 0)
-        XCTAssertEqual(summary.segments.filter { $0 == .down }.count, 0)
-        XCTAssertEqual(summary.upRatio, 1.0)
+        XCTAssertEqual(history.observationCount(for: 1), 1)
+        XCTAssertEqual(history.summary(for: 1, now: now).upRatio, 1.0)
+    }
+
+    func testPruneBoundaryKeepsExactly24h() {
+        let history = StatusHistory(fileURL: nil)
+        history.record([1: .down], at: ago(24 * 3600))
+        history.record([2: .down], at: ago(24 * 3600 + 1))
+        history.record([:], at: now)
+        XCTAssertEqual(history.observationCount(for: 1), 1)
+        XCTAssertEqual(history.observationCount(for: 2), 0)
+    }
+
+    func testLoadPrunesOlderThan24h() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let old = now.timeIntervalSince1970 - 25 * 3600
+        let recent = now.timeIntervalSince1970 - 100
+        try Data(#"{"1":[{"t":\#(old),"d":true},{"t":\#(recent),"d":false}]}"#.utf8).write(to: file)
+        let history = StatusHistory(fileURL: file)
+        try history.load(now: now)
+        XCTAssertEqual(history.observationCount(for: 1), 1)
+    }
+
+    func testLoadMergesDuplicateSensorKeys() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let t = now.timeIntervalSince1970 - 100
+        try Data(#"{"1":[{"t":\#(t),"d":true}],"01":[{"t":\#(t),"d":false}]}"#.utf8).write(to: file)
+        let history = StatusHistory(fileURL: file)
+        try history.load(now: now)
+        XCTAssertEqual(history.observationCount(for: 1), 2)
     }
 
     func testRoundTripSaveLoad() throws {
@@ -86,7 +116,7 @@ final class StatusHistoryTests: XCTestCase {
         try first.save()
 
         let second = StatusHistory(fileURL: file)
-        try second.load()
+        try second.load(now: now)
         XCTAssertEqual(second.summary(for: 1, now: now), first.summary(for: 1, now: now))
         XCTAssertEqual(second.summary(for: 2, now: now).segments[47], .up)
     }
@@ -95,7 +125,7 @@ final class StatusHistoryTests: XCTestCase {
         let file = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString).appendingPathComponent("history.json")
         let history = StatusHistory(fileURL: file)
-        try history.load()
+        try history.load(now: now)
         XCTAssertNil(history.summary(for: 1, now: now).upRatio)
     }
 

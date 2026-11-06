@@ -76,13 +76,19 @@ final class StatusHistory {
         try JSONEncoder().encode(stored).write(to: fileURL, options: .atomic)
     }
 
-    func load() throws {
+    func observationCount(for sensorId: Int) -> Int {
+        observations[sensorId]?.count ?? 0
+    }
+
+    func load(now: Date = Date()) throws {
         guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else { return }
         let stored = try JSONDecoder().decode([String: [Observation]].self, from: Data(contentsOf: fileURL))
-        observations = Dictionary(uniqueKeysWithValues: stored.compactMap { key, value in
-            Int(key).map { ($0, value) }
-        })
-        prune(now: Date())
+        // "1" and "01" parse to the same id, so merge instead of trapping on duplicates.
+        observations = Dictionary(
+            stored.compactMap { key, value in Int(key).map { ($0, value) } },
+            uniquingKeysWith: { $0 + $1 }
+        )
+        prune(now: now)
     }
 
     private func prune(now: Date) {
