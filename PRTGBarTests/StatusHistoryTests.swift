@@ -69,7 +69,7 @@ final class StatusHistoryTests: XCTestCase {
         let history = StatusHistory(fileURL: nil)
         history.record([1: .down], at: ago(25 * 3600))
         history.record([1: .up], at: now)
-        XCTAssertEqual(history.observationCount(for: 1), 1)
+        XCTAssertEqual(history.slotCount(for: 1), 1)
         XCTAssertEqual(history.summary(for: 1, now: now).upRatio, 1.0)
     }
 
@@ -78,31 +78,52 @@ final class StatusHistoryTests: XCTestCase {
         history.record([1: .down], at: ago(24 * 3600))
         history.record([2: .down], at: ago(24 * 3600 + 1))
         history.record([:], at: now)
-        XCTAssertEqual(history.observationCount(for: 1), 1)
-        XCTAssertEqual(history.observationCount(for: 2), 0)
+        XCTAssertEqual(history.slotCount(for: 1), 1)
+        XCTAssertEqual(history.slotCount(for: 2), 0)
+    }
+
+    func testStorageIsBoundedPerSensor() {
+        let history = StatusHistory(fileURL: nil)
+        for poll in 0..<200 {
+            history.record([1: poll % 7 == 0 ? .down : .up], at: ago(Double(199 - poll) * 60))
+        }
+        XCTAssertLessThanOrEqual(history.slotCount(for: 1), 48)
+        XCTAssertEqual(history.slotCount(for: 1), 8)
+    }
+
+    func testSaveIsDueOncePerSlot() {
+        let history = StatusHistory(fileURL: nil)
+        history.record([1: .up], at: ago(100))
+        XCTAssertTrue(history.saveIfNeeded(now: ago(100)))
+        XCTAssertFalse(history.saveIfNeeded(now: ago(50)))
+        XCTAssertTrue(history.saveIfNeeded(now: now.addingTimeInterval(10)))
     }
 
     func testLoadPrunesOlderThan24h() throws {
         let file = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
-        let old = now.timeIntervalSince1970 - 25 * 3600
-        let recent = now.timeIntervalSince1970 - 100
-        try Data(#"{"1":[{"t":\#(old),"d":true},{"t":\#(recent),"d":false}]}"#.utf8).write(to: file)
+        let old = Int(now.timeIntervalSince1970 - 25 * 3600)
+        let recent = Int(now.timeIntervalSince1970 - slot)
+        try Data(#"{"1":{"\#(old)":2,"\#(recent)":1}}"#.utf8).write(to: file)
         let history = StatusHistory(fileURL: file)
         try history.load(now: now)
-        XCTAssertEqual(history.observationCount(for: 1), 1)
+        XCTAssertEqual(history.slotCount(for: 1), 1)
+        XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .up)
     }
 
     func testLoadMergesDuplicateSensorKeys() throws {
         let file = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
-        let t = now.timeIntervalSince1970 - 100
-        try Data(#"{"1":[{"t":\#(t),"d":true}],"01":[{"t":\#(t),"d":false}]}"#.utf8).write(to: file)
+        let newer = Int(now.timeIntervalSince1970 - slot)
+        let older = Int(now.timeIntervalSince1970 - 2 * slot)
+        try Data(#"{"1":{"\#(newer)":2},"01":{"\#(older)":1}}"#.utf8).write(to: file)
         let history = StatusHistory(fileURL: file)
         try history.load(now: now)
-        XCTAssertEqual(history.observationCount(for: 1), 2)
+        XCTAssertEqual(history.slotCount(for: 1), 2)
+        XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .down)
+        XCTAssertEqual(history.summary(for: 1, now: now).segments[46], .up)
     }
 
     func testRoundTripSaveLoad() throws {

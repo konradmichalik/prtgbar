@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import UserNotifications
+import os
 
 @MainActor
 final class AppState: ObservableObject {
@@ -55,7 +56,11 @@ final class AppState: ObservableObject {
 
     func onLaunch() {
         SettingsMigration.run(.standard)
-        try? history.load()
+        do {
+            try history.load()
+        } catch {
+            Logger.history.error("Loading status history failed: \(error.localizedDescription)")
+        }
         if DemoData.isEnabled {
             loadDemoData()
             return
@@ -209,8 +214,17 @@ final class AppState: ObservableObject {
     }
 
     private func recordHistory(_ states: [Int: SensorStatus]) {
-        history.record(states, at: Date())
-        try? history.save()
+        let now = Date()
+        history.record(states, at: now)
+        history.saveIfNeeded(now: now)
+    }
+
+    func onTerminate() {
+        do {
+            try history.save()
+        } catch {
+            Logger.history.error("Saving status history failed: \(error.localizedDescription)")
+        }
     }
 
     private func sensorStates(in nodes: [TreeNode]) -> [Int: SensorStatus] {

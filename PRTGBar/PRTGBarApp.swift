@@ -96,4 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController = StatusItemController(appState: appState)
         appState.onLaunch()
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        appState.onTerminate()
+    }
 }
