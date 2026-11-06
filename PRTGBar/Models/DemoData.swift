@@ -30,9 +30,15 @@ enum DemoData {
         ]
     }
 
+    private struct Outage {
+        let id: Int
+        let hoursAgo: Double
+        let minutes: Double
+    }
+
     /// Sensor 101 was down for 90 minutes about 5 h ago, sensor 201 for 30 minutes about 2 h ago.
     @MainActor static func seedHistory(_ history: StatusHistory, now: Date) {
-        let outages: [(id: Int, hoursAgo: Double, minutes: Double)] = [(101, 5, 90), (201, 2, 30)]
+        let outages = [Outage(id: 101, hoursAgo: 5, minutes: 90), Outage(id: 201, hoursAgo: 2, minutes: 30)]
         for outage in outages {
             let downStart = now.addingTimeInterval(-outage.hoursAgo * 3600)
             let downEnd = downStart.addingTimeInterval(outage.minutes * 60)
