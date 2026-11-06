@@ -75,6 +75,7 @@ final class AppState: ObservableObject {
         problemTimestamps = DemoData.problemTimestamps
         lastUpdated = Date()
         isConfigured = true
+        DemoData.seedHistory(history, now: Date())
         recordHistory(sensorStates(in: treeNodes))
         updateMenuModel()
     }
