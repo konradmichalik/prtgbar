@@ -86,11 +86,15 @@ final class AppState: ObservableObject {
     private var timerCancellable: AnyCancellable?
     private var credentialsRestart: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var activeServerURL: String?
+    /// Bumped on a server change so a fetch still running for the old server is discarded.
+    private var serverGeneration = 0
     private var alertEngine = AlertEngine()
     private(set) var problemTimestamps: [Int: Date] = [:]
 
     func startPolling() {
         stopPolling()
+        resetIfServerChanged()
         updateMenuModel()
         isConfigured = !serverURL.isEmpty && !apiKey.isEmpty
         guard isConfigured else { return }
@@ -108,6 +112,21 @@ final class AppState: ObservableObject {
     func stopPolling() {
         timerCancellable?.cancel()
         timerCancellable = nil
+    }
+
+    /// Alert state, problem times and history are keyed by object id, and another server reuses those ids.
+    private func resetIfServerChanged() {
+        defer { activeServerURL = serverURL }
+        guard let activeServerURL, activeServerURL != serverURL else { return }
+        serverGeneration += 1
+        refreshTask = nil
+        alertEngine = AlertEngine()
+        problemTimestamps = [:]
+        history.removeAll()
+        history.saveIfNeeded(now: Date())
+        treeNodes = []
+        lastUpdated = nil
+        lastError = nil
     }
 
     /// Settings store every keystroke, so polling restarts once typing pauses instead of per character.
@@ -131,6 +150,7 @@ final class AppState: ObservableObject {
     }
 
     private func fetchAndApply() async {
+        let generation = serverGeneration
         isLoading = true
         lastError = nil
 
@@ -140,8 +160,10 @@ final class AppState: ObservableObject {
                     serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
                 )
             }.value
+            guard generation == serverGeneration else { return }
             apply(objects)
         } catch {
+            guard generation == serverGeneration else { return }
             lastError = error.localizedDescription
         }
 

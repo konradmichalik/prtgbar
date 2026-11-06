@@ -99,6 +99,16 @@ final class StatusHistoryTests: XCTestCase {
         XCTAssertTrue(history.saveIfNeeded(now: now.addingTimeInterval(10)))
     }
 
+    func testRemoveAllClearsHistoryAndMakesSaveDue() {
+        let history = StatusHistory(fileURL: nil)
+        history.record([1: .down], at: ago(100))
+        history.saveIfNeeded(now: ago(100))
+        history.removeAll()
+        XCTAssertEqual(history.slotCount(for: 1), 0)
+        XCTAssertNil(history.summary(for: 1, now: now).upRatio)
+        XCTAssertTrue(history.saveIfNeeded(now: ago(50)))
+    }
+
     func testLoadPrunesOlderThan24h() throws {
         let file = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(UUID().uuidString).json")
