@@ -175,18 +175,3 @@ func durationProgress(_ seconds: TimeInterval) -> CGFloat {
         return min(1.0, 0.66 + CGFloat((days - 1) / 6) * 0.34)
     }
 }
-
-func formatDuration(_ seconds: TimeInterval) -> String {
-    let s = Int(seconds)
-    guard s > 0 else { return "" }
-
-    let minutes = s / 60
-    let hours = minutes / 60
-    let days = hours / 24
-
-    if minutes < 1 { return "< 1m" }
-    if hours < 1 { return "\(minutes)m" }
-    if days < 1 { return "\(hours)h \(minutes % 60)m" }
-    if days < 7 { return "\(days)d \(hours % 24)h" }
-    return "\(days)d"
-}
