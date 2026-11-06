@@ -2,10 +2,12 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedTab: SettingsTab?
+    @State private var selectedTab = SettingsTab.initial(
+        serverURL: UserDefaults.standard.string(forKey: "serverURL") ?? ""
+    )
 
     var body: some View {
-        TabView(selection: tabBinding) {
+        TabView(selection: $selectedTab) {
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
@@ -23,14 +25,6 @@ struct SettingsView: View {
         .onAppear(perform: raiseWindow)
     }
 
-    /// Without a server there is nothing else worth configuring, so the window opens on Server.
-    private var tabBinding: Binding<SettingsTab> {
-        Binding(
-            get: { selectedTab ?? (appState.serverURL.isEmpty ? .server : .general) },
-            set: { selectedTab = $0 }
-        )
-    }
-
     private func raiseWindow() {
         DispatchQueue.main.async {
             for window in NSApp.windows where window.title == "Settings" || window.identifier?.rawValue.contains("settings") == true {
@@ -41,6 +35,12 @@ struct SettingsView: View {
     }
 }
 
-private enum SettingsTab: Hashable {
+enum SettingsTab: Hashable {
     case general, server, notifications, about
+
+    /// Without a server there is nothing else worth configuring, so the window opens on Server.
+    /// Decided once at creation: recomputing it would jump away while the first URL is typed.
+    static func initial(serverURL: String) -> SettingsTab {
+        serverURL.isEmpty ? .server : .general
+    }
 }

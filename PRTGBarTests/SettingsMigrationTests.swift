@@ -61,10 +61,26 @@ final class SettingsMigrationTests: XCTestCase {
         XCTAssertEqual(defaults.integer(forKey: "settingsVersion"), 2)
     }
 
+    func testFreshInstallLeavesDefaultsUnset() {
+        SettingsMigration.run(defaults)
+
+        for key in ["notifyOnDown", "notifyOnWarning", "notifyOnRecovery", "refreshInterval"] {
+            XCTAssertNil(defaults.object(forKey: key), key)
+        }
+        XCTAssertEqual(defaults.integer(forKey: "settingsVersion"), 2)
+    }
+
+    func testInitialTabDependsOnServerURL() {
+        XCTAssertEqual(SettingsTab.initial(serverURL: ""), .server)
+        XCTAssertEqual(SettingsTab.initial(serverURL: "prtg.example.com"), .general)
+    }
+
     func testIdempotent() {
         defaults.set(false, forKey: "notifyOnStatusChange")
         defaults.set(100.0, forKey: "refreshInterval")
         SettingsMigration.run(defaults)
+        XCTAssertEqual(defaults.object(forKey: "notifyOnDown") as? Bool, false)
+        XCTAssertEqual(defaults.double(forKey: "refreshInterval"), 120)
         defaults.set(true, forKey: "notifyOnDown")
         defaults.set(45.0, forKey: "refreshInterval")
 
