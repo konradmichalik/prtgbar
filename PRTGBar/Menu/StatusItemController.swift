@@ -100,16 +100,20 @@ final class StatusItemController: NSObject, NSMenuDelegate, MenuActions {
             .store(in: &cancellables)
     }
 
+    /// The poll timer runs in .common modes, so refreshes arrive while the menu is tracking. Replacing
+    /// the items then would close an open submenu; menuNeedsUpdate rebuilds on the next open instead.
     private func modelDidChange(_ model: MenuModel) {
         updateStatusItem(model: model)
-        // The poll timer runs in .common modes, so refreshes arrive while the menu is tracking.
-        if isMenuOpen { rebuildMenu(model: model) }
+        guard isMenuOpen, let lastUpdated = model.lastUpdated,
+              let refresh = menu.items.first(where: { $0.keyEquivalent == "r" }) else { return }
+        refresh.attributedTitle = MenuBuilder.Context.rowTitle(
+            "Refresh", secondary: MenuText.updatedAgo(lastUpdated, now: Date()))
     }
 
-    private func rebuildMenu(model: MenuModel? = nil) {
+    private func rebuildMenu() {
         let history = appState.history
         let built = MenuBuilder.build(
-            model ?? appState.menuModel,
+            appState.menuModel,
             history: { history.summary(for: $0, now: Date()) },
             actions: self
         )
