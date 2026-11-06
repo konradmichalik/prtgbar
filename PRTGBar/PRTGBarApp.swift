@@ -48,7 +48,10 @@ struct SettingsOpener: View {
     }
 }
 
-final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
+final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    /// Only touched on the main actor.
+    nonisolated(unsafe) weak var appState: AppState?
+
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -56,6 +59,27 @@ final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
     ) {
         let hasSound = notification.request.content.sound != nil
         handler(hasSound ? [.banner, .sound] : [.banner])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler handler: @escaping () -> Void
+    ) {
+        let action = response.actionIdentifier
+        let info = response.notification.request.content.userInfo
+        let sensorIds = info["sensorIds"] as? [Int] ?? []
+        let deviceId = info["deviceId"] as? Int
+        nonisolated(unsafe) let done = handler
+        Task { @MainActor in
+            defer { done() }
+            guard let appState = self.appState else { return }
+            if action == NotificationDispatcher.acknowledgeAction {
+                await appState.acknowledge(ids: sensorIds, message: nil)
+            } else if let deviceId {
+                appState.open(objectId: deviceId)
+            }
+        }
     }
 }
 
@@ -66,7 +90,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        notificationHandler.appState = appState
         UNUserNotificationCenter.current().delegate = notificationHandler
+        NotificationDispatcher.registerCategories(center: .current())
         statusItemController = StatusItemController(appState: appState)
         appState.onLaunch()
     }

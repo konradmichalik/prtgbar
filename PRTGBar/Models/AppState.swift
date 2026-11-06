@@ -77,7 +77,7 @@ final class AppState: ObservableObject {
     // MARK: - Polling
 
     private var timerCancellable: AnyCancellable?
-    private var previousSensorStates: [Int: SensorStatus] = [:]
+    private var alertEngine = AlertEngine()
     private(set) var problemTimestamps: [Int: Date] = [:]
 
     func startPolling() {
@@ -115,7 +115,8 @@ final class AppState: ObservableObject {
 
             let tree = TreeBuilder.buildTree(from: objects)
 
-            detectStatusChanges(objects: objects)
+            updateProblemTimestamps(objects: objects)
+            deliverAlerts(for: tree)
             recordHistory(sensorStates(in: tree))
 
             var transaction = Transaction()
@@ -232,74 +233,77 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func detectStatusChanges(objects: [PrtgObject]) {
-        let sensors = objects.filter { $0.kind == .sensor }
-        var newStates: [Int: SensorStatus] = [:]
-        var newTimestamps = problemTimestamps
-
-        for sensor in sensors {
+    private func updateProblemTimestamps(objects: [PrtgObject]) {
+        var timestamps = problemTimestamps
+        for sensor in objects where sensor.kind == .sensor {
             guard let status = sensor.status else { continue }
-            newStates[sensor.id] = status
-
             if SensorStatus.problemStatuses.contains(status) {
-                if newTimestamps[sensor.id] == nil {
-                    newTimestamps[sensor.id] = Date()
-                }
+                if timestamps[sensor.id] == nil { timestamps[sensor.id] = Date() }
             } else {
-                newTimestamps.removeValue(forKey: sensor.id)
-            }
-
-            guard notifyOnStatusChange,
-                  let previousStatus = previousSensorStates[sensor.id],
-                  previousStatus != status else { continue }
-
-            let shouldNotify: Bool
-            switch status {
-            case .down, .partialdown:
-                shouldNotify = notifyOnDown
-            case .warning, .unusual:
-                shouldNotify = notifyOnWarning
-            default:
-                shouldNotify = false
-            }
-
-            if shouldNotify {
-                sendNotification(
-                    sensorName: sensor.name,
-                    deviceName: sensor.parent?.name,
-                    sensorStatus: status,
-                    playSound: notificationSound
-                )
+                timestamps.removeValue(forKey: sensor.id)
             }
         }
-
-        previousSensorStates = newStates
-        problemTimestamps = newTimestamps
+        problemTimestamps = timestamps
     }
 
-    nonisolated private func sendNotification(
-        sensorName: String,
-        deviceName: String?,
-        sensorStatus: SensorStatus,
-        playSound: Bool
-    ) {
-        let content = UNMutableNotificationContent()
-        content.title = "Sensor \(sensorStatus.notificationLabel)"
-        if let deviceName, !deviceName.isEmpty {
-            content.body = "\(deviceName) › \(sensorName)"
-        } else {
-            content.body = sensorName
-        }
-        if playSound {
-            content.sound = .default
-        }
+    /// Temporary mapping of the legacy settings; the alert settings pane replaces it.
+    private func makeAlertConfig(now: Date) -> AlertConfig {
+        var config = AlertConfig()
+        config.alertOnDown = notifyOnStatusChange && notifyOnDown
+        config.alertOnWarning = notifyOnStatusChange && notifyOnWarning
+        config.alertOnRecovery = notifyOnStatusChange
+        let snoozeEnd = Date(timeIntervalSince1970: snoozedUntil)
+        config.snoozedUntil = snoozedUntil > 0 && snoozeEnd > now ? snoozeEnd : nil
+        return config
+    }
 
-        let request = UNNotificationRequest(
-            identifier: "sensor-\(sensorName)-\(Date().timeIntervalSince1970)",
-            content: content,
-            trigger: nil
-        )
+    private func deliverAlerts(for tree: [TreeNode]) {
+        guard !DemoData.isEnabled else { return }
+        let now = Date()
+        alertEngine.config = makeAlertConfig(now: now)
+        let alerts = alertEngine.process(Self.snapshots(in: tree), at: now)
+        NotificationDispatcher.deliver(alerts, soundEnabled: notificationSound)
+    }
 
-        UNUserNotificationCenter.current().add(request)
+    static func snapshots(in roots: [TreeNode]) -> [SensorSnapshot] {
+        var result: [SensorSnapshot] = []
+        func walk(_ node: TreeNode, ancestors: [TreeNode]) {
+            if node.kind == .sensor, let device = ancestors.last(where: { $0.kind == .device }) {
+                result.append(SensorSnapshot(
+                    id: node.id, name: node.name, deviceId: device.id, deviceName: device.name,
+                    projectName: ProjectBuilder.projectName(ancestors: ancestors), status: node.status,
+                    isAcknowledged: SensorMessage(node.message ?? "").isAcknowledged, message: node.message
+                ))
+            }
+            for child in node.children { walk(child, ancestors: ancestors + [node]) }
+        }
+        roots.forEach { walk($0, ancestors: []) }
+        return result
+    }
+
+    // MARK: - Opening PRTG
+
+    func open(objectId: Int) {
+        let page = switch findNode(id: objectId)?.kind {
+        case .device: "/device.htm"
+        case .group: "/group.htm"
+        case .probedevice: "/probenode.htm"
+        case .sensor, nil: "/sensor.htm"
+        }
+        open(path: page, objectId: objectId)
+    }
+
+    func open(path: String, objectId: Int?) {
+        let server = DemoData.isEnabled ? DemoData.serverURL : serverURL
+        let base = server
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard var components = URLComponents(string: base.contains("://") ? base : "https://\(base)") else { return }
+        // The web UI listens on the default HTTPS port even when the API uses another one.
+        components.port = nil
+        components.path = path
+        components.queryItems = objectId.map { [URLQueryItem(name: "id", value: "\($0)")] }
+        guard let url = components.url else { return }
+        NSWorkspace.shared.open(url)
     }
 }
