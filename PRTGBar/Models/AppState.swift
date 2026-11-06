@@ -85,6 +85,7 @@ final class AppState: ObservableObject {
 
     private var timerCancellable: AnyCancellable?
     private var credentialsRestart: Task<Void, Never>?
+    private var refreshTask: Task<Void, Never>?
     private var alertEngine = AlertEngine()
     private(set) var problemTimestamps: [Int: Date] = [:]
 
@@ -120,8 +121,16 @@ final class AppState: ObservableObject {
     }
 
     func refresh() async {
-        guard !serverURL.isEmpty, !apiKey.isEmpty else { return }
+        guard !DemoData.isEnabled, !serverURL.isEmpty, !apiKey.isEmpty else { return }
+        // One fetch at a time, so an older response can never reach AlertEngine after a newer one.
+        if let running = refreshTask { return await running.value }
+        let task = Task { await fetchAndApply() }
+        refreshTask = task
+        await task.value
+        if refreshTask == task { refreshTask = nil }
+    }
 
+    private func fetchAndApply() async {
         isLoading = true
         lastError = nil
 
@@ -131,27 +140,30 @@ final class AppState: ObservableObject {
                     serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
                 )
             }.value
-
-            let tree = TreeBuilder.buildTree(from: objects)
-
-            updateProblemTimestamps(objects: objects)
-            deliverAlerts(for: tree)
-            recordHistory(sensorStates(in: tree))
-
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                treeNodes = tree
-                lastUpdated = Date()
-                lastError = nil
-                actionError = nil
-            }
+            apply(objects)
         } catch {
             lastError = error.localizedDescription
         }
 
         isLoading = false
         updateMenuModel()
+    }
+
+    private func apply(_ objects: [PrtgObject]) {
+        let tree = TreeBuilder.buildTree(from: objects)
+
+        updateProblemTimestamps(objects: objects)
+        deliverAlerts(for: tree)
+        recordHistory(sensorStates(in: tree))
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            treeNodes = tree
+            lastUpdated = Date()
+            lastError = nil
+            actionError = nil
+        }
     }
 
     func testConnection() async -> Bool {
