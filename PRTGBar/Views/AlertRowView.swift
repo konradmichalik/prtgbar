@@ -41,8 +41,8 @@ struct AlertRowView: View {
 
     private var headerRow: some View {
         HStack(spacing: 4) {
-            if let groupName = item.groupName, !groupName.isEmpty {
-                Text(groupName)
+            if !item.projectName.isEmpty {
+                Text(item.projectName)
                     .font(.caption2.weight(.bold))
                     .textCase(.uppercase)
                     .foregroundStyle(.primary.opacity(0.55))

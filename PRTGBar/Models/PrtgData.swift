@@ -227,14 +227,16 @@ struct ProblemItem: Identifiable {
     let status: SensorStatus
     let message: String?
     let deviceName: String
-    let groupName: String?
+    let deviceId: Int
+    let projectName: String
+    let isAcknowledged: Bool
     let downSince: Date?
 
     var breadcrumb: String {
-        if let groupName, !deviceName.isEmpty {
-            return "\(groupName) › \(deviceName)"
+        if !projectName.isEmpty, !deviceName.isEmpty {
+            return "\(projectName) › \(deviceName)"
         }
-        return deviceName.isEmpty ? (groupName ?? "") : deviceName
+        return deviceName.isEmpty ? projectName : deviceName
     }
 
     static func collect(from nodes: [TreeNode], fallbackTimestamps: [Int: Date] = [:]) -> [ProblemItem] {
@@ -265,14 +267,15 @@ struct ProblemItem: Identifiable {
     ) {
         if node.kind == .sensor, node.status != .up, node.status != .paused {
             let device = ancestors.last { $0.kind == .device }
-            let group = ancestors.last { $0.kind == .group }
             items.append(ProblemItem(
                 id: node.id,
                 sensorName: node.name,
                 status: node.status,
                 message: node.message,
                 deviceName: device?.name ?? "",
-                groupName: group?.name,
+                deviceId: device?.id ?? 0,
+                projectName: ProjectBuilder.projectName(ancestors: ancestors),
+                isAcknowledged: SensorMessage(node.message ?? "").isAcknowledged,
                 downSince: node.lastDown ?? fallbackTimestamps[node.id]
             ))
         }

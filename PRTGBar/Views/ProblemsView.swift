@@ -66,7 +66,7 @@ struct ProblemsView: View {
             result = result.filter { item in
                 item.sensorName.lowercased().contains(query)
                     || item.deviceName.lowercased().contains(query)
-                    || (item.groupName?.lowercased().contains(query) ?? false)
+                    || item.projectName.lowercased().contains(query)
                     || (item.message?.lowercased().contains(query) ?? false)
             }
         }

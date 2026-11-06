@@ -13,7 +13,7 @@ struct ProjectDevice: Identifiable, Equatable {
     let acknowledgedCount: Int
 
     var heading: String {
-        (path + [name]).joined(separator: " › ")
+        ProjectBuilder.heading(path: path, deviceName: name)
     }
 
     var quietSummary: String {
@@ -50,6 +50,16 @@ enum ProjectBuilder {
             return ancestors[index].name
         }
         return ancestors.last { $0.kind == .probedevice }?.name ?? ""
+    }
+
+    /// Group names between the project group and the device, root first.
+    static func subgroupPath(ancestors: [TreeNode]) -> [String] {
+        projectGroupIndex(ancestors: ancestors)
+            .map { ancestors[($0 + 1)...].filter { $0.kind == .group }.map(\.name) } ?? []
+    }
+
+    static func heading(path: [String], deviceName: String) -> String {
+        (path + [deviceName]).joined(separator: " › ")
     }
 
     static func projects(from roots: [TreeNode]) -> [Project] {
@@ -99,7 +109,7 @@ enum ProjectBuilder {
         guard let probe = ancestors.last(where: { $0.kind == .probedevice }) else { return }
         let groupIndex = projectGroupIndex(ancestors: ancestors)
         let id = groupIndex.map { ancestors[$0].id } ?? probe.id
-        let path = groupIndex.map { ancestors[($0 + 1)...].filter { $0.kind == .group }.map(\.name) } ?? []
+        let path = subgroupPath(ancestors: ancestors)
 
         let sensors = node.children.filter { $0.kind == .sensor }
         let problems = sensors.filter(isProblem).sorted { a, b in
