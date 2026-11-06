@@ -76,7 +76,7 @@ extension MenuBuilder.Context {
         let item = NSMenuItem(title: "Snooze Notifications", action: nil, keyEquivalent: "")
         var options = [
             action("1 Hour") { $0.snooze(until: Date().addingTimeInterval(3600)) },
-            action("Until Tomorrow 08:00") { $0.snooze(until: MenuBuilder.nextMorning(after: Date())) },
+            action("Until 08:00") { $0.snooze(until: MenuBuilder.nextMorning(after: Date())) },
         ]
         if let until = model.snoozedUntil {
             let time = until.formatted(date: .omitted, time: .shortened)
@@ -132,7 +132,7 @@ extension MenuBuilder.Context {
     private func pauseMenu(objectId: Int) -> NSMenu {
         MenuBuilder.makeMenu([
             action("1 Hour") { $0.pause(objectId: objectId, minutes: 60) },
-            action("Until Tomorrow 08:00") {
+            action("Until 08:00") {
                 $0.pause(objectId: objectId, minutes: MenuBuilder.minutesUntilNextMorning(from: Date()))
             },
             action("Indefinitely") { $0.pause(objectId: objectId, minutes: nil) },

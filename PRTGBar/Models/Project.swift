@@ -18,7 +18,7 @@ struct ProjectDevice: Identifiable, Equatable {
 
     var quietSummary: String {
         switch (problemSensors.isEmpty, pausedCount > 0) {
-        case (true, false): "All \(upCount) sensors up"
+        case (true, false): upCount == 1 ? "All 1 sensor up" : "All \(upCount) sensors up"
         case (true, true): "\(upCount) up, \(pausedCount) paused"
         case (false, true): "\(upCount) more up, \(pausedCount) paused"
         case (false, false): "\(upCount) more up"

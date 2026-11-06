@@ -148,6 +148,7 @@ final class ProjectBuilderTests: XCTestCase {
         }
 
         XCTAssertEqual(summary(problems: [], up: 5, paused: 0), "All 5 sensors up")
+        XCTAssertEqual(summary(problems: [], up: 1, paused: 0), "All 1 sensor up")
         XCTAssertEqual(summary(problems: [], up: 5, paused: 2), "5 up, 2 paused")
         XCTAssertEqual(summary(problems: [sensor(1, .down)], up: 5, paused: 2), "5 more up, 2 paused")
         XCTAssertEqual(summary(problems: [sensor(1, .down)], up: 5, paused: 0), "5 more up")

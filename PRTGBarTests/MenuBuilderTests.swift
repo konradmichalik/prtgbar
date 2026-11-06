@@ -45,7 +45,7 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertNotNil(shop.items.first { $0.title == "Open Project in PRTG" })
 
         let office = try XCTUnwrap(item("Office", in: menu)?.submenu)
-        XCTAssertNotNil(office.items.first { $0.title == "All 1 sensors up" })
+        XCTAssertNotNil(office.items.first { $0.title == "All 1 sensor up" })
     }
 
     func testSensorSubmenuActions() throws {
@@ -59,7 +59,7 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(titles, ["Acknowledge…", "Pause", "Open in PRTG", "Copy Sensor Name", "Copy Sensor ID"])
 
         let pause = try XCTUnwrap(detail.items.first { $0.title == "Pause" }?.submenu)
-        XCTAssertEqual(pause.items.map(\.title), ["1 Hour", "Until Tomorrow 08:00", "Indefinitely"])
+        XCTAssertEqual(pause.items.map(\.title), ["1 Hour", "Until 08:00", "Indefinitely"])
 
         trigger(try XCTUnwrap(detail.items.first { $0.title == "Copy Sensor ID" }))
         trigger(try XCTUnwrap(detail.items.first { $0.title == "Acknowledge…" }))
@@ -109,9 +109,18 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(actions.refreshCount, 1)
     }
 
+    func testActionErrorShowsLineWithoutRetry() {
+        let menu = build(makeModel(actionError: "This API key is read-only or lacks permission for this action."))
+
+        XCTAssertTrue(menu.items[0].title.hasPrefix("This API key is read-only"))
+        XCTAssertFalse(menu.items[0].isEnabled)
+        XCTAssertNil(item("Retry", in: menu))
+        XCTAssertNotNil(item("DOWN", in: menu))
+    }
+
     func testSnoozeSubmenuShowsOffOnlyWhenSnoozed() throws {
         let plain = try XCTUnwrap(item("Snooze Notifications", in: build(makeModel()))?.submenu)
-        XCTAssertEqual(plain.items.map(\.title), ["1 Hour", "Until Tomorrow 08:00"])
+        XCTAssertEqual(plain.items.map(\.title), ["1 Hour", "Until 08:00"])
 
         let snoozed = makeModel(snoozedUntil: Date().addingTimeInterval(600))
         let submenu = try XCTUnwrap(item("Snooze Notifications", in: build(snoozed))?.submenu)
@@ -130,7 +139,7 @@ final class MenuBuilderTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeModel(error: String? = nil, snoozedUntil: Date? = nil) -> MenuModel {
+    private func makeModel(error: String? = nil, actionError: String? = nil, snoozedUntil: Date? = nil) -> MenuModel {
         let web = TreeNode(id: 100, name: "web-01", kind: .device, status: .down, children: [
             TreeNode(id: 1, name: "HTTP", kind: .sensor, status: .down, message: "Timeout"),
             TreeNode(id: 2, name: "Disk Free", kind: .sensor, status: .warning),
@@ -147,7 +156,7 @@ final class MenuBuilderTests: XCTestCase {
         ])
         return MenuModel.make(roots: [probe], timestamps: [:], sort: .newestFirst,
                               serverURL: "https://prtg.example.com", lastUpdated: Date(),
-                              error: error, snoozedUntil: snoozedUntil)
+                              error: error, actionError: actionError, snoozedUntil: snoozedUntil)
     }
 
     private func build(_ model: MenuModel) -> NSMenu {

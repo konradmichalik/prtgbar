@@ -10,6 +10,7 @@ final class AppState: ObservableObject {
     @Published var treeNodes: [TreeNode] = []
     @Published var isLoading = false
     @Published var lastError: String?
+    @Published var actionError: String?
     @Published var lastUpdated: Date?
     @Published var isConfigured = false
     @Published private(set) var menuModel = MenuModel.make(
@@ -123,6 +124,7 @@ final class AppState: ObservableObject {
                 treeNodes = tree
                 lastUpdated = Date()
                 lastError = nil
+                actionError = nil
             }
         } catch {
             lastError = error.localizedDescription
@@ -165,16 +167,17 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Failures surface through `lastError` so the menu shows them, e.g. the read-only copy for 401/403.
+    /// Failures surface through `actionError`, not `lastError`, so a read-only key does not look like an unreachable server.
     private func performWrite(_ write: @escaping @Sendable (String, String, Bool) async throws -> Void) async {
         guard !DemoData.isEnabled else { return }
         do {
             try await Task.detached { [serverURL, apiKey, acceptSelfSignedCerts] in
                 try await write(serverURL, apiKey, acceptSelfSignedCerts)
             }.value
+            actionError = nil
             await refresh()
         } catch {
-            lastError = error.localizedDescription
+            actionError = error.localizedDescription
             updateMenuModel()
         }
     }
@@ -195,6 +198,7 @@ final class AppState: ObservableObject {
             serverURL: DemoData.isEnabled ? DemoData.serverURL : serverURL,
             lastUpdated: lastUpdated,
             error: lastError,
+            actionError: actionError,
             snoozedUntil: snoozeEnd > now ? snoozeEnd : nil
         )
     }

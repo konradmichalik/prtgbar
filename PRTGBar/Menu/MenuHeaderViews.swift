@@ -39,7 +39,7 @@ struct SummaryHeaderView: View {
         guard hasData else { return Text("Waiting for data…").foregroundColor(.secondary) }
         if isAllUp {
             let count = summary.up.formatted(.number.locale(Locale(identifier: "en_US")))
-            return Text("All \(count) sensors up").foregroundColor(.secondary)
+            return Text(summary.up == 1 ? "All 1 sensor up" : "All \(count) sensors up").foregroundColor(.secondary)
         }
         let parts = MenuText.summaryLine(summary).components(separatedBy: " · ").map(glyphPart)
         return parts.dropFirst().reduce(parts.first ?? Text("")) { line, part in

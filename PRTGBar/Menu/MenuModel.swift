@@ -7,6 +7,8 @@ struct MenuModel {
     let projects: [Project]
     let lastUpdated: Date?
     let errorMessage: String?
+    /// A failed acknowledge or pause; unlike `errorMessage` it says nothing about reachability.
+    let actionError: String?
     let snoozedUntil: Date?
     let isConfigured: Bool
 
@@ -17,6 +19,7 @@ struct MenuModel {
         serverURL: String,
         lastUpdated: Date?,
         error: String?,
+        actionError: String? = nil,
         snoozedUntil: Date?
     ) -> MenuModel {
         MenuModel(
@@ -26,6 +29,7 @@ struct MenuModel {
             projects: ProjectBuilder.projects(from: roots),
             lastUpdated: lastUpdated,
             errorMessage: error,
+            actionError: actionError,
             snoozedUntil: snoozedUntil,
             isConfigured: !serverURL.isEmpty
         )

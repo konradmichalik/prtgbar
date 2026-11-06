@@ -210,12 +210,18 @@ extension MenuBuilder.Context {
     // MARK: - Private
 
     private func errorItems() -> [NSMenuItem] {
-        guard let error = model.errorMessage else { return [] }
-        let item = NSMenuItem(title: MenuText.truncated(error), action: nil, keyEquivalent: "")
+        let unreachable = model.errorMessage.map { [errorLine($0), action("Retry") { $0.refresh() }] } ?? []
+        let failedAction = model.actionError.map { [errorLine($0)] } ?? []
+        let items = unreachable + failedAction
+        return items.isEmpty ? [] : items + [.separator()]
+    }
+
+    private func errorLine(_ message: String) -> NSMenuItem {
+        let item = NSMenuItem(title: MenuText.truncated(message, max: 72), action: nil, keyEquivalent: "")
         item.image = MenuGlyph.down.image
-        item.toolTip = error
+        item.toolTip = message
         item.isEnabled = false
-        return [item, action("Retry") { $0.refresh() }, .separator()]
+        return item
     }
 
     private func sensorSection(_ title: String, _ items: [ProblemItem]) -> [NSMenuItem] {

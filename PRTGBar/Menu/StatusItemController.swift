@@ -186,8 +186,10 @@ private enum StatusIcon {
     static func accessibilityLabel(for state: StatusItemState) -> String {
         switch state {
         case .allUp: "PRTG: all sensors up"
-        case .warningsOnly(let count): count > 0 ? "PRTG: \(count) warnings" : "PRTG: warnings"
-        case .down(let count): count > 0 ? "PRTG: \(count) sensors down" : "PRTG: sensors down"
+        case .warningsOnly(let count):
+            count == 1 ? "PRTG: 1 warning" : (count > 0 ? "PRTG: \(count) warnings" : "PRTG: warnings")
+        case .down(let count):
+            count == 1 ? "PRTG: 1 sensor down" : (count > 0 ? "PRTG: \(count) sensors down" : "PRTG: sensors down")
         case .unreachable: "PRTG: server not reachable"
         case .snoozed: "PRTG: notifications snoozed"
         }

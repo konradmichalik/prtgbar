@@ -35,6 +35,12 @@ final class StatusItemStateTests: XCTestCase {
         XCTAssertEqual(StatusItemState.make(model: model, showCount: true, showWarningIndicator: true), .unreachable)
     }
 
+    func testWriteErrorWithDownSensorsStaysDown() {
+        let model = makeModel(roots: [device(statuses: [.down, .up])],
+                              actionError: "This API key is read-only or lacks permission for this action.")
+        XCTAssertEqual(StatusItemState.make(model: model, showCount: true, showWarningIndicator: false), .down(1))
+    }
+
     func testSnoozedKeepsDownCount() {
         let model = makeModel(roots: [device(statuses: [.down, .up])], snoozedUntil: Date().addingTimeInterval(600))
 
@@ -62,8 +68,10 @@ final class StatusItemStateTests: XCTestCase {
         return TreeNode(id: 100, name: "dev", kind: .device, status: .up, children: sensors)
     }
 
-    private func makeModel(roots: [TreeNode], error: String? = nil, snoozedUntil: Date? = nil) -> MenuModel {
+    private func makeModel(
+        roots: [TreeNode], error: String? = nil, actionError: String? = nil, snoozedUntil: Date? = nil
+    ) -> MenuModel {
         MenuModel.make(roots: roots, timestamps: [:], sort: .newestFirst, serverURL: "prtg.example.com",
-                       lastUpdated: Date(), error: error, snoozedUntil: snoozedUntil)
+                       lastUpdated: Date(), error: error, actionError: actionError, snoozedUntil: snoozedUntil)
     }
 }
