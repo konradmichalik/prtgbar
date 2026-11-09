@@ -25,7 +25,7 @@ PRTGBar sits in your macOS menu bar and shows all down and warning sensors from 
 
 ## ✨ Features
 
-- **Native menu** with problems first, then your projects (the top-level groups below each probe) with their devices and sensors
+- **Native menu** with problems grouped by device and group path, then your projects with their devices and sensors. A project is a top-level group by default, or a second-level group (for example the customers inside a team group)
 - **Sensor details** with a 24 h history strip, uptime ratio and outage count, kept locally
 - **Menu bar badge** with the live count of down sensors, optionally a warning indicator
 - **Calm notifications** grouped per device or group, with a wait before alerting, flapping mute, reminders and recovery messages

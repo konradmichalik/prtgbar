@@ -21,14 +21,16 @@ struct ProblemList {
     let acknowledged: [ProblemItem]
     let paused: [PausedDeviceLine]
 
-    static func make(from roots: [TreeNode], timestamps: [Int: Date], sort: ProblemSort) -> ProblemList {
-        let items = ProblemItem.collect(from: roots, fallbackTimestamps: timestamps)
+    static func make(
+        from roots: [TreeNode], timestamps: [Int: Date], sort: ProblemSort, projectLevel: Int = 1
+    ) -> ProblemList {
+        let items = ProblemItem.collect(from: roots, fallbackTimestamps: timestamps, projectLevel: projectLevel)
         let open = items.filter { !$0.isAcknowledged }
         return ProblemList(
             down: sorted(open.filter(\.status.isDownClass), by: sort),
             warning: sorted(open.filter(\.status.isWarningClass), by: sort),
             acknowledged: sorted(items.filter(\.isAcknowledged), by: sort),
-            paused: pausedLines(from: roots)
+            paused: pausedLines(from: roots, projectLevel: projectLevel)
         )
     }
 
@@ -64,22 +66,24 @@ struct ProblemList {
         }
     }
 
-    private static func pausedLines(from roots: [TreeNode]) -> [PausedDeviceLine] {
+    private static func pausedLines(from roots: [TreeNode], projectLevel: Int) -> [PausedDeviceLine] {
         var lines: [PausedDeviceLine] = []
         for root in roots {
-            collectPaused(root, ancestors: [], into: &lines)
+            collectPaused(root, ancestors: [], projectLevel: projectLevel, into: &lines)
         }
         return lines.sorted { $0.heading.localizedCaseInsensitiveCompare($1.heading) == .orderedAscending }
     }
 
-    private static func collectPaused(_ node: TreeNode, ancestors: [TreeNode], into lines: inout [PausedDeviceLine]) {
+    private static func collectPaused(
+        _ node: TreeNode, ancestors: [TreeNode], projectLevel: Int, into lines: inout [PausedDeviceLine]
+    ) {
         if node.kind == .device {
             let count = node.children.filter { $0.kind == .sensor && $0.status == .paused }.count
             if count > 0 {
                 lines.append(PausedDeviceLine(
                     deviceId: node.id,
                     heading: ProjectBuilder.heading(
-                        path: ProjectBuilder.subgroupPath(ancestors: ancestors),
+                        path: ProjectBuilder.subgroupPath(ancestors: ancestors, level: projectLevel),
                         deviceName: node.name
                     ),
                     pausedCount: count
@@ -88,7 +92,7 @@ struct ProblemList {
             return
         }
         for child in node.children {
-            collectPaused(child, ancestors: ancestors + [node], into: &lines)
+            collectPaused(child, ancestors: ancestors + [node], projectLevel: projectLevel, into: &lines)
         }
     }
 }

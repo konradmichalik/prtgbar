@@ -17,6 +17,8 @@ struct MenuModel {
         var roots: [TreeNode] = []
         var timestamps: [Int: Date] = [:]
         var sort: ProblemSort = .newestFirst
+        /// Which group level counts as a project, see `ProjectBuilder`.
+        var projectLevel = 1
         var serverURL = ""
         /// Only whether a key exists; the key itself never enters the model.
         var hasAPIKey = false
@@ -31,8 +33,10 @@ struct MenuModel {
         MenuModel(
             serverHost: host(of: input.serverURL),
             summary: summary(of: input.roots),
-            problems: ProblemList.make(from: input.roots, timestamps: input.timestamps, sort: input.sort),
-            projects: ProjectBuilder.projects(from: input.roots),
+            problems: ProblemList.make(
+                from: input.roots, timestamps: input.timestamps, sort: input.sort, projectLevel: input.projectLevel
+            ),
+            projects: ProjectBuilder.projects(from: input.roots, level: input.projectLevel),
             lastUpdated: input.lastUpdated,
             errorMessage: input.error,
             actionError: input.actionError,

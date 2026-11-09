@@ -183,10 +183,12 @@ struct ProblemItem: Identifiable {
         return deviceName.isEmpty ? projectName : deviceName
     }
 
-    static func collect(from nodes: [TreeNode], fallbackTimestamps: [Int: Date] = [:]) -> [ProblemItem] {
+    static func collect(
+        from nodes: [TreeNode], fallbackTimestamps: [Int: Date] = [:], projectLevel: Int = 1
+    ) -> [ProblemItem] {
         var items: [ProblemItem] = []
         for node in nodes {
-            walk(node, ancestors: [], fallbackTimestamps: fallbackTimestamps, into: &items)
+            walk(node, ancestors: [], fallbackTimestamps: fallbackTimestamps, projectLevel: projectLevel, into: &items)
         }
         return items.sorted { a, b in
             // Primary: severity (lower = more critical)
@@ -207,6 +209,7 @@ struct ProblemItem: Identifiable {
         _ node: TreeNode,
         ancestors: [TreeNode],
         fallbackTimestamps: [Int: Date],
+        projectLevel: Int,
         into items: inout [ProblemItem]
     ) {
         if node.kind == .sensor, node.status != .up, node.status != .paused {
@@ -218,14 +221,17 @@ struct ProblemItem: Identifiable {
                 message: node.message,
                 deviceName: device?.name ?? "",
                 deviceId: device?.id ?? 0,
-                projectName: ProjectBuilder.projectName(ancestors: ancestors),
+                projectName: ProjectBuilder.projectName(ancestors: ancestors, level: projectLevel),
                 groupPath: ancestors.filter { $0.kind == .group }.map(\.name),
                 isAcknowledged: node.isAcknowledged,
                 downSince: node.lastDown ?? fallbackTimestamps[node.id]
             ))
         }
         for child in node.children {
-            walk(child, ancestors: ancestors + [node], fallbackTimestamps: fallbackTimestamps, into: &items)
+            walk(
+                child, ancestors: ancestors + [node], fallbackTimestamps: fallbackTimestamps,
+                projectLevel: projectLevel, into: &items
+            )
         }
     }
 }

@@ -18,6 +18,10 @@ struct GeneralSettingsView: View {
                     Text("By device").tag(ProblemSort.byDevice.rawValue)
                 }
                 Toggle("Show 24 h history in sensor details", isOn: $appState.showHistory)
+                Picker("Projects are", selection: $appState.projectLevel) {
+                    Text("Top-level groups").tag(1)
+                    Text("Second-level groups").tag(2)
+                }
             }
             Section {
                 Toggle("Launch at login", isOn: $launchAtLogin)
@@ -26,6 +30,7 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .onChange(of: appState.problemSort) { _, _ in appState.updateMenuModel() }
         .onChange(of: appState.showHistory) { _, _ in appState.updateMenuModel() }
+        .onChange(of: appState.projectLevel) { _, _ in appState.updateMenuModel() }
         .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
         .onAppear { launchAtLogin = SMAppService.mainApp.status == .enabled }
     }

@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     @AppStorage("acceptSelfSignedCerts") var acceptSelfSignedCerts = true
     @AppStorage("showWarningIndicator") var showWarningIndicator = false
     @AppStorage("problemSort") var problemSort = ProblemSort.newestFirst.rawValue
+    @AppStorage("projectLevel") var projectLevel = 1
     @AppStorage("showHistory") var showHistory = true
     @AppStorage("notifyOnRecovery") var notifyOnRecovery = true
     @AppStorage("alertExtraChecks") var alertExtraChecks = 1
@@ -270,6 +271,7 @@ final class AppState: ObservableObject {
             roots: treeNodes,
             timestamps: problemTimestamps,
             sort: ProblemSort(rawValue: problemSort) ?? .newestFirst,
+            projectLevel: projectLevel,
             serverURL: DemoData.isEnabled ? DemoData.serverURL : serverURL,
             hasAPIKey: DemoData.isEnabled || !apiKey.isEmpty,
             lastUpdated: lastUpdated,
@@ -340,19 +342,19 @@ final class AppState: ObservableObject {
         guard !DemoData.isEnabled else { return }
         let now = Date()
         alertEngine.config = makeAlertConfig(now: now)
-        let alerts = alertEngine.process(Self.snapshots(in: tree), at: now)
+        let alerts = alertEngine.process(Self.snapshots(in: tree, projectLevel: projectLevel), at: now)
         NotificationDispatcher.deliver(
             alerts, soundEnabled: notificationSound, server: NotificationDispatcher.serverKey(serverURL))
     }
 
-    static func snapshots(in roots: [TreeNode]) -> [SensorSnapshot] {
+    static func snapshots(in roots: [TreeNode], projectLevel: Int = 1) -> [SensorSnapshot] {
         var result: [SensorSnapshot] = []
         func walk(_ node: TreeNode, ancestors: [TreeNode]) {
             if node.kind == .sensor, let device = ancestors.last(where: { $0.kind == .device }) {
                 result.append(SensorSnapshot(
                     id: node.id, name: node.name, deviceId: device.id, deviceName: device.name,
-                    projectId: ProjectBuilder.projectId(ancestors: ancestors),
-                    projectName: ProjectBuilder.projectName(ancestors: ancestors), status: node.status,
+                    projectId: ProjectBuilder.projectId(ancestors: ancestors, level: projectLevel),
+                    projectName: ProjectBuilder.projectName(ancestors: ancestors, level: projectLevel), status: node.status,
                     isAcknowledged: node.isAcknowledged, message: node.message
                 ))
             }

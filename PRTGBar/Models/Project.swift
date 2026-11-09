@@ -42,20 +42,20 @@ struct Project: Identifiable, Equatable {
 // MARK: - Project Building
 
 enum ProjectBuilder {
-    /// Name of the group directly below a probe in the ancestor chain (root first),
-    /// or the probe name when the node hangs directly under the probe.
-    static func projectName(ancestors: [TreeNode]) -> String {
-        projectNode(ancestors: ancestors)?.name ?? ""
+    /// Name of the project group in the ancestor chain (root first), or the probe name
+    /// when the node hangs directly under the probe. `level` counts groups from the top, the probe excluded.
+    static func projectName(ancestors: [TreeNode], level: Int = 1) -> String {
+        projectNode(ancestors: ancestors, level: level)?.name ?? ""
     }
 
     /// Names repeat across probes, so grouping goes by this id.
-    static func projectId(ancestors: [TreeNode]) -> Int? {
-        projectNode(ancestors: ancestors)?.id
+    static func projectId(ancestors: [TreeNode], level: Int = 1) -> Int? {
+        projectNode(ancestors: ancestors, level: level)?.id
     }
 
     /// Group names between the project group and the device, root first.
-    static func subgroupPath(ancestors: [TreeNode]) -> [String] {
-        projectGroupIndex(ancestors: ancestors)
+    static func subgroupPath(ancestors: [TreeNode], level: Int = 1) -> [String] {
+        projectGroupIndex(ancestors: ancestors, level: level)
             .map { ancestors[($0 + 1)...].filter { $0.kind == .group }.map(\.name) } ?? []
     }
 
@@ -63,10 +63,10 @@ enum ProjectBuilder {
         (path + [deviceName]).joined(separator: " › ")
     }
 
-    static func projects(from roots: [TreeNode]) -> [Project] {
+    static func projects(from roots: [TreeNode], level: Int = 1) -> [Project] {
         var buckets: [Bucket] = []
         for root in roots {
-            collect(root, ancestors: [], into: &buckets)
+            collect(root, ancestors: [], level: level, into: &buckets)
         }
         let projects = buckets.map(makeProject).sorted { a, b in
             if a.worstStatus.severity != b.worstStatus.severity {
@@ -90,33 +90,35 @@ enum ProjectBuilder {
         var worstStatus: SensorStatus = .up
     }
 
-    private static func projectNode(ancestors: [TreeNode]) -> TreeNode? {
-        if let index = projectGroupIndex(ancestors: ancestors) {
+    private static func projectNode(ancestors: [TreeNode], level: Int) -> TreeNode? {
+        if let index = projectGroupIndex(ancestors: ancestors, level: level) {
             return ancestors[index]
         }
         return ancestors.last { $0.kind == .probedevice }
     }
 
-    private static func projectGroupIndex(ancestors: [TreeNode]) -> Int? {
-        ancestors.indices.dropFirst().first {
-            ancestors[$0].kind == .group && ancestors[$0 - 1].kind == .probedevice
-        }
+    /// The group at `level`, or the deepest group when the device sits higher up.
+    /// Counting groups instead of looking for the probe keeps projects working when no probe was loaded.
+    private static func projectGroupIndex(ancestors: [TreeNode], level: Int) -> Int? {
+        let groupIndices = ancestors.indices.filter { ancestors[$0].kind == .group }
+        guard !groupIndices.isEmpty else { return nil }
+        return groupIndices[min(max(level, 1), groupIndices.count) - 1]
     }
 
-    private static func collect(_ node: TreeNode, ancestors: [TreeNode], into buckets: inout [Bucket]) {
+    private static func collect(_ node: TreeNode, ancestors: [TreeNode], level: Int, into buckets: inout [Bucket]) {
         if node.kind == .device {
-            add(device: node, ancestors: ancestors, into: &buckets)
+            add(device: node, ancestors: ancestors, level: level, into: &buckets)
             return
         }
         for child in node.children {
-            collect(child, ancestors: ancestors + [node], into: &buckets)
+            collect(child, ancestors: ancestors + [node], level: level, into: &buckets)
         }
     }
 
-    private static func add(device node: TreeNode, ancestors: [TreeNode], into buckets: inout [Bucket]) {
-        guard let probe = ancestors.last(where: { $0.kind == .probedevice }),
-              let id = projectId(ancestors: ancestors) else { return }
-        let path = subgroupPath(ancestors: ancestors)
+    private static func add(device node: TreeNode, ancestors: [TreeNode], level: Int, into buckets: inout [Bucket]) {
+        guard let id = projectId(ancestors: ancestors, level: level) else { return }
+        let probeName = ancestors.last { $0.kind == .probedevice }?.name ?? ""
+        let path = subgroupPath(ancestors: ancestors, level: level)
 
         let sensors = node.children.filter { $0.kind == .sensor }
         let problems = sensors.filter(isProblem).sorted { a, b in
@@ -133,7 +135,7 @@ enum ProjectBuilder {
         )
 
         var bucket = buckets.first { $0.id == id }
-            ?? Bucket(id: id, name: projectName(ancestors: ancestors), probeName: probe.name)
+            ?? Bucket(id: id, name: projectName(ancestors: ancestors, level: level), probeName: probeName)
         bucket.devices.append(projectDevice)
         bucket.sensorCount += sensors.count
         bucket.downCount += problems.filter(\.status.isDownClass).count
@@ -175,7 +177,7 @@ enum ProjectBuilder {
     private static func applyDisplayNames(to projects: [Project]) -> [Project] {
         let nameCounts = Dictionary(grouping: projects, by: \.name).mapValues(\.count)
         return projects.map { project in
-            guard nameCounts[project.name, default: 0] > 1 else { return project }
+            guard nameCounts[project.name, default: 0] > 1, !project.probeName.isEmpty else { return project }
             var renamed = project
             renamed.displayName = "\(project.name) · \(project.probeName)"
             return renamed

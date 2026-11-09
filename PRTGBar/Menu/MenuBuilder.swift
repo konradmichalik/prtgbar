@@ -335,6 +335,7 @@ extension MenuBuilder.Context {
         guard let entry = devicesById[item.deviceId] else { return item.breadcrumb }
         let project = entry.project
         let projectPart = project.name == project.probeName ? [] : [project.name]
-        return ([project.probeName] + projectPart + [entry.device.heading]).joined(separator: " › ")
+        return ([project.probeName] + projectPart + [entry.device.heading])
+            .filter { !$0.isEmpty }.joined(separator: " › ")
     }
 }

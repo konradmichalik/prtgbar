@@ -126,6 +126,46 @@ final class ProjectBuilderTests: XCTestCase {
         XCTAssertEqual(project.downCount, 0)
     }
 
+    func testSecondLevelGroupBecomesProjectWhenConfigured() {
+        let roots = [
+            probe(1, "Cloud Probe", children: [
+                group(10, "Team A", children: [
+                    group(11, "vhw", children: [
+                        group(12, "Stage", children: [device(100, "Middleware - Stage", sensors: [sensor(1000, .up)])]),
+                        device(101, "Middleware - Production", sensors: [sensor(1001, .warning)]),
+                    ]),
+                    group(13, "Wilka", children: [device(102, "Webserver", sensors: [sensor(1002, .up)])]),
+                ]),
+                group(20, "Office", children: [device(200, "router", sensors: [sensor(2000, .up)])]),
+            ])
+        ]
+
+        let projects = ProjectBuilder.projects(from: roots, level: 2)
+
+        XCTAssertEqual(projects.map(\.name), ["vhw", "Office", "Wilka"])
+        XCTAssertEqual(projects.map(\.id), [11, 20, 13])
+        XCTAssertEqual(projects[0].devices.map(\.heading), ["Middleware - Production", "Stage › Middleware - Stage"])
+        XCTAssertEqual(projects[0].probeName, "Cloud Probe")
+    }
+
+    func testProjectsWithoutLoadedProbe() {
+        let roots = [
+            group(10, "Team A", children: [
+                group(11, "vhw", children: [device(100, "api", sensors: [sensor(1000, .up)])]),
+            ]),
+            group(20, "Team B", children: [
+                group(21, "vhw", children: [device(200, "db", sensors: [sensor(2000, .up)])]),
+            ]),
+        ]
+
+        let projects = ProjectBuilder.projects(from: roots, level: 2)
+
+        XCTAssertEqual(projects.map(\.name), ["vhw", "vhw"])
+        XCTAssertEqual(projects.map(\.probeName), ["", ""])
+        XCTAssertEqual(projects.map(\.displayName), ["vhw", "vhw"], "no probe suffix without a probe name")
+        XCTAssertEqual(ProjectBuilder.projects(from: roots).map(\.name), ["Team A", "Team B"])
+    }
+
     func testProjectNameFromAncestors() {
         let probeNode = probe(1, "Dresden", children: [])
         let top = group(10, "Kunde A", children: [])
@@ -133,6 +173,9 @@ final class ProjectBuilderTests: XCTestCase {
 
         XCTAssertEqual(ProjectBuilder.projectName(ancestors: [probeNode, top, nested]), "Kunde A")
         XCTAssertEqual(ProjectBuilder.projectName(ancestors: [probeNode]), "Dresden")
+        XCTAssertEqual(ProjectBuilder.projectName(ancestors: [probeNode, top, nested], level: 2), "Web")
+        XCTAssertEqual(ProjectBuilder.projectName(ancestors: [probeNode, top], level: 2), "Kunde A")
+        XCTAssertEqual(ProjectBuilder.subgroupPath(ancestors: [probeNode, top, nested], level: 2), [])
     }
 
     // MARK: - Quiet Summary

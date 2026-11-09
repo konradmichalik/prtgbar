@@ -49,7 +49,8 @@ extension MenuBuilder.Context {
         let devices = MenuText.count(project.devices.count, "device")
         let header = ProjectHeaderView(
             name: project.displayName,
-            detail: "\(project.probeName) · \(devices) · \(MenuText.count(project.sensorCount, "sensor"))"
+            detail: [project.probeName, devices, MenuText.count(project.sensorCount, "sensor")]
+                .filter { !$0.isEmpty }.joined(separator: " · ")
         )
         let deviceItems = project.devices.flatMap { device in
             [NSMenuItem.sectionHeader(title: MenuText.truncated(device.heading))]
