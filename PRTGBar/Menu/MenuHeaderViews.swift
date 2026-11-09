@@ -17,11 +17,10 @@ struct SummaryHeaderView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            if isAllUp {
-                Image(systemName: MenuGlyph.up.symbolName)
-                    .font(.system(size: 28))
-                    .foregroundStyle(Color(nsColor: MenuGlyph.up.color))
-            }
+            Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+                .resizable()
+                .frame(width: 32, height: 32)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text("PRTG").font(.headline)
@@ -38,7 +37,7 @@ struct SummaryHeaderView: View {
     private var summaryLine: Text {
         guard hasData else { return Text("Waiting for data…").foregroundColor(.secondary) }
         if isAllUp {
-            return Text("All \(MenuText.count(summary.up, "sensor")) up").foregroundColor(.secondary)
+            return glyphPart(.up, "All \(MenuText.count(summary.up, "sensor")) up")
         }
         let parts = MenuText.summaryParts(summary).map { glyphPart($0.glyph, $0.text) }
         return parts.dropFirst().reduce(parts.first ?? Text("")) { line, part in

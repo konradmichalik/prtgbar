@@ -47,9 +47,14 @@ enum MenuGlyph {
         }
     }
 
+    /// A single palette colour would also fill the inner mark of `.fill` symbols and hide it.
+    private var paletteColors: [NSColor] {
+        symbolName.hasSuffix(".fill") ? [.white, color] : [color]
+    }
+
     var image: NSImage? {
         let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [color]))
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: paletteColors))
         image?.isTemplate = false
         return image
     }
@@ -180,8 +185,8 @@ extension MenuBuilder.Context {
         let summary = SummaryHeaderView(host: model.serverHost, summary: model.summary, hasData: model.lastUpdated != nil)
         var items: [NSMenuItem] = errorItems()
         items.append(headerItem(summary))
-        items.append(contentsOf: sensorSection("DOWN", model.problems.down))
-        items.append(contentsOf: sensorSection("WARNING", model.problems.warning))
+        items.append(NSMenuItem.separator())
+        items.append(contentsOf: problemItems())
         items.append(contentsOf: acknowledgedItems())
         items.append(contentsOf: projectSection())
         items.append(NSMenuItem.separator())
@@ -273,18 +278,11 @@ extension MenuBuilder.Context {
         return item
     }
 
-    private func sensorSection(_ title: String, _ items: [ProblemItem]) -> [NSMenuItem] {
-        guard !items.isEmpty else { return [] }
-        var section: [NSMenuItem] = [.sectionHeader(title: title)]
-        for group in Self.groupedByDevice(items) {
-            section.append(deviceLine(group[0]))
-            for problem in group {
-                let item = sensorItem(row(problem), showDevice: false)
-                item.indentationLevel = 1
-                section.append(item)
-            }
+    /// Down before warning; the glyph tells them apart, so there are no section titles.
+    private func problemItems() -> [NSMenuItem] {
+        Self.groupedByDevice(model.problems.down + model.problems.warning).flatMap { group in
+            [deviceLine(group[0])] + group.map { sensorItem(row($0), showDevice: false) }
         }
-        return section
     }
 
     /// Keeps the problem order: a device appears where its first problem would.
@@ -300,9 +298,13 @@ extension MenuBuilder.Context {
 
     private func deviceLine(_ item: ProblemItem) -> NSMenuItem {
         let path = ProjectBuilder.heading(path: item.groupPath, deviceName: item.deviceName)
-        let line = NSMenuItem(title: MenuText.truncated(path, max: 56), action: nil, keyEquivalent: "")
+        let deviceId = item.deviceId
+        let line = action(MenuText.truncated(path, max: 56)) { $0.open(objectId: deviceId) }
+        line.attributedTitle = NSAttributedString(
+            string: line.title,
+            attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.secondaryLabelColor]
+        )
         line.toolTip = path
-        line.isEnabled = false
         return line
     }
 
@@ -340,10 +342,6 @@ extension MenuBuilder.Context {
     private func appItems() -> [NSMenuItem] {
         [
             action("Settings…", key: ",") { $0.openSettings() },
-            ClosureMenuItem(title: "About PRTGBar") {
-                NSApp.activate()
-                NSApp.orderFrontStandardAboutPanel(nil)
-            },
             .separator(),
             action("Quit PRTGBar", key: "q") { $0.quit() },
         ]
