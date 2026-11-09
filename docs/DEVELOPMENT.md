@@ -47,6 +47,16 @@ make clean
 make lint
 ```
 
+## Landing Page
+
+The website lives in `site/` as plain HTML, CSS and JavaScript, without a build step. Preview it locally:
+
+```sh
+python3 -m http.server 8765 --directory site
+```
+
+`.github/workflows/pages.yml` publishes `site/` to GitHub Pages on every push to `main` that touches it. The repository's Pages source has to be set to **GitHub Actions** once.
+
 ## Project Layout
 
 ```
@@ -72,7 +82,7 @@ PRTGBar/
 │   ├── PrtgData.swift              DTOs, TreeNode, TreeBuilder, ProblemItem
 │   ├── Project.swift               Projects, devices and subgroups from the tree
 │   ├── ProblemList.swift           Sorted problems, acknowledged and paused lines
-│   ├── StatusHistory.swift         Local 24 h history behind the strip, one up/down flag pair per 30 min
+│   ├── StatusHistory.swift         Local 24 h history behind the strip, one set of state flags per 30 min
 │   ├── SettingsMigration.swift     Migrates settings from older versions
 │   └── DemoData.swift              Demo tree and history for `--demo`
 ├── Services/
