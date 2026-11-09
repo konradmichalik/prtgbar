@@ -221,7 +221,9 @@ a {
 }
 
 .gradient-text {
-  background: linear-gradient(90deg, #8fa82a, #e08a10 50%, #d40d62);
+  /* The colours repeat so the running animation loops without a seam. */
+  background: linear-gradient(90deg, #8fa82a, #e08a10, #d40d62, #e08a10, #8fa82a);
+  background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -853,23 +855,33 @@ a {
   }
 
   .glows {
-    animation: hue 14s ease-in-out infinite alternate;
+    animation: hue 10s ease-in-out infinite alternate;
+  }
+
+  .gradient-text {
+    animation: run-colours 8s linear infinite;
+  }
+
+  @keyframes run-colours {
+    to {
+      background-position: 200% center;
+    }
   }
 
   .g1 {
-    animation: drift-a 11s ease-in-out infinite alternate;
+    animation: drift-a 8s ease-in-out infinite alternate;
   }
 
   .g2 {
-    animation: drift-b 13s ease-in-out infinite alternate;
+    animation: drift-b 10s ease-in-out infinite alternate;
   }
 
   .g3 {
-    animation: drift-a 9s ease-in-out infinite alternate-reverse;
+    animation: drift-a 7s ease-in-out infinite alternate-reverse;
   }
 
   .g4 {
-    animation: drift-b 12s ease-in-out infinite alternate-reverse;
+    animation: drift-b 9s ease-in-out infinite alternate-reverse;
   }
 
   @keyframes hue {
@@ -878,31 +890,31 @@ a {
     }
 
     to {
-      filter: blur(48px) hue-rotate(40deg);
+      filter: blur(48px) hue-rotate(70deg);
     }
   }
 
   @keyframes drift-a {
     from {
       transform: translate(0, 0) scale(1);
-      opacity: 0.85;
+      opacity: 0.75;
     }
 
     to {
-      transform: translate(6%, 4%) scale(1.08);
+      transform: translate(14%, 10%) scale(1.18);
       opacity: 1;
     }
   }
 
   @keyframes drift-b {
     from {
-      transform: translate(0, 0) scale(1.05);
+      transform: translate(0, 0) scale(1.1);
       opacity: 1;
     }
 
     to {
-      transform: translate(-5%, -4%) scale(0.95);
-      opacity: 0.8;
+      transform: translate(-12%, -10%) scale(0.9);
+      opacity: 0.7;
     }
   }
 }
