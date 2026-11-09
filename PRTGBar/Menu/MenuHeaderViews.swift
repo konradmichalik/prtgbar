@@ -1,6 +1,18 @@
 import AppKit
 import SwiftUI
 
+extension View {
+    /// Menus are translucent and apps cannot change their material, so our own views sit on an opaque card.
+    func menuCard() -> some View {
+        background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+        )
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+    }
+}
+
 enum MenuLayout {
     static let headerWidth: CGFloat = 340
     static let detailWidth: CGFloat = 300
@@ -46,9 +58,10 @@ struct SummaryHeaderView: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .frame(minWidth: MenuLayout.headerWidth, maxWidth: .infinity, alignment: .leading)
+        .frame(minWidth: MenuLayout.headerWidth - 12, maxWidth: .infinity, alignment: .leading)
+        .menuCard()
     }
 
     private var summaryLine: Text {
@@ -108,9 +121,10 @@ struct ProjectHeaderView: View {
             StatusSummaryText.make(summary).font(.callout)
             Text(detail).font(.callout).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .frame(width: MenuLayout.detailWidth, alignment: .leading)
+        .frame(width: MenuLayout.detailWidth - 12, alignment: .leading)
+        .menuCard()
     }
 }
 
@@ -141,9 +155,10 @@ struct SensorDetailHeaderView: View {
             }
             Text(breadcrumb).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .frame(width: MenuLayout.detailWidth, alignment: .leading)
+        .frame(width: MenuLayout.detailWidth - 12, alignment: .leading)
+        .menuCard()
     }
 
     static func historyLine(_ history: HistorySummary) -> String {
