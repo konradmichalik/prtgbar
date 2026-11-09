@@ -17,8 +17,11 @@ struct SummaryHeaderView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
-                .resizable()
+            Image(nsImage: GaugeIcon.image(
+                size: NSSize(width: 32, height: 32),
+                level: hasData ? GaugeLevel(summary) : .ok,
+                style: .logo
+            ))
                 .frame(width: 32, height: 32)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -91,6 +94,7 @@ struct SensorDetailHeaderView: View {
     let statusLine: String
     let statusColor: NSColor
     let message: String?
+    let lastValue: String?
     let history: HistorySummary?
     let breadcrumb: String
 
@@ -100,6 +104,9 @@ struct SensorDetailHeaderView: View {
             Text(statusLine).font(.callout).foregroundStyle(Color(nsColor: statusColor))
             if let message, !message.isEmpty {
                 Text(message).font(.callout).foregroundStyle(.secondary).lineLimit(3)
+            }
+            if let lastValue, !lastValue.isEmpty {
+                Text("Last value: \(lastValue)").font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
             if let history {
                 UptimeStripView(segments: history.segments).padding(.top, 2)

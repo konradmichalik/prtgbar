@@ -5,6 +5,15 @@ final class PrtgClientTests: XCTestCase {
 
     // MARK: - JSON Decoding
 
+    func testDecodeSensorTableCarriesLastValue() throws {
+        let json = #"{"sensors":[{"objid":1,"name":"Ping","status_raw":3,"parentid":100,"lastvalue":"8 msec"}]}"#
+
+        let objects = try PrtgClient.decodeTable(Data(json.utf8), kind: .sensor)
+
+        XCTAssertEqual(objects.map(\.lastValue), ["8 msec"])
+        XCTAssertEqual(TreeBuilder.buildTree(from: objects).first?.lastValue, "8 msec")
+    }
+
     func testDecodePrtgObject() throws {
         let json = """
         {

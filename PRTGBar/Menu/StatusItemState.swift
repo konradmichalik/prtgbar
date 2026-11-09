@@ -19,13 +19,18 @@ enum StatusItemState: Equatable {
         return .allUp
     }
 
-    /// A hidden down count still needs a mark, or down would look exactly like all up.
+    /// The gauge shows warning and down itself; only snooze needs an extra mark.
     var badgeSymbol: String? {
+        if case .snoozed = self { return "bell.slash" }
+        return nil
+    }
+
+    var gaugeLevel: GaugeLevel {
         switch self {
-        case .warningsOnly: "exclamationmark.triangle.fill"
-        case .down(let count): count > 0 ? nil : "xmark.circle.fill"
-        case .snoozed: "bell.slash"
-        case .allUp, .unreachable: nil
+        case .allUp, .unreachable: .ok
+        case .warningsOnly: .warning
+        case .down: .down
+        case .snoozed(let downCount): downCount > 0 ? .down : .ok
         }
     }
 

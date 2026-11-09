@@ -100,8 +100,10 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(heading.title, "web-01")
         let quiet = try XCTUnwrap(shop.items.first { $0.title == "1 more up, 1 paused" })
         let allSensors = populated(try XCTUnwrap(quiet.submenu))
-        XCTAssertEqual(allSensors.items.map(\.title), ["CPU", "Disk Free", "HTTP", "Ping"])
-        XCTAssertTrue(allSensors.items.allSatisfy { $0.submenu == nil && $0.action != nil })
+        XCTAssertEqual(allSensors.items.map { $0.title.components(separatedBy: "\t")[0] }, ["CPU", "Disk Free", "HTTP", "Ping"])
+        XCTAssertTrue(allSensors.items.allSatisfy { $0.submenu != nil }, "every sensor has its detail submenu")
+        let ping = try XCTUnwrap(allSensors.items.first { $0.title.hasPrefix("Ping") })
+        XCTAssertEqual(ping.title, "Ping\t12 msec", "last value in the trailing column")
         XCTAssertNotNil(shop.items.first { $0.title == "Open Project in PRTG" })
 
         let office = populated(try XCTUnwrap(project("Office", in: menu)?.submenu))
@@ -114,7 +116,9 @@ final class MenuBuilderTests: XCTestCase {
         let office = populated(try XCTUnwrap(project("Office", in: menu)?.submenu))
         let list = populated(try XCTUnwrap(office.items.first { $0.title == "All 1 sensor up" }?.submenu))
 
-        trigger(try XCTUnwrap(list.items.first { $0.title == "Ping" }))
+        let detail = populated(try XCTUnwrap(list.items.first { $0.title.hasPrefix("Ping") }?.submenu))
+        XCTAssertNil(detail.items.first { $0.title == "Acknowledge…" }, "nothing to acknowledge on an up sensor")
+        trigger(try XCTUnwrap(detail.items.first { $0.title == "Open in PRTG" }))
         XCTAssertEqual(actions.opened, [6])
     }
 
@@ -180,9 +184,9 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(requested, [1])
     }
 
-    func testNoMoreThanTwoSubmenuLevels() {
+    func testNoMoreThanThreeSubmenuLevels() {
         let menu = build(makeModel())
-        XCTAssertLessThanOrEqual(depth(of: menu), 2)
+        XCTAssertLessThanOrEqual(depth(of: menu), 3)
     }
 
     func testAcknowledgedAndPausedSubmenu() throws {
@@ -252,7 +256,7 @@ final class MenuBuilderTests: XCTestCase {
         let web = TreeNode(id: 100, name: "web-01", kind: .device, status: .down, children: [
             TreeNode(id: 1, name: "HTTP", kind: .sensor, status: .down, message: "Timeout"),
             TreeNode(id: 2, name: "Disk Free", kind: .sensor, status: .warning),
-            TreeNode(id: 3, name: "Ping", kind: .sensor, status: .up),
+            TreeNode(id: 3, name: "Ping", kind: .sensor, status: .up, lastValue: "12 msec"),
             TreeNode(id: 4, name: "CPU", kind: .sensor, status: .paused),
         ])
         let nas = TreeNode(id: 200, name: "nas", kind: .device, status: .up, children: [

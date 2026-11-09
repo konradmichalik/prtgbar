@@ -156,13 +156,23 @@ final class StatusItemController: NSObject, NSMenuDelegate, MenuActions {
 
 @MainActor
 private enum StatusIcon {
+    private static let size = NSSize(width: 18, height: 18)
+
     static func image(for state: StatusItemState) -> NSImage? {
-        guard let base = NSImage(named: "MenubarIcon") else { return nil }
-        base.isTemplate = true
+        let level = state.gaugeLevel
+        let base = GaugeIcon.image(size: size, level: level, style: style(for: level))
         if state == .unreachable { return composite(base, badge: nil, slashed: true) }
         guard let name = state.badgeSymbol else { return base }
-        let size: CGFloat = if case .snoozed = state { 11 } else { 8 }
-        return composite(base, badge: symbol(name, size: size), slashed: false)
+        return composite(base, badge: symbol(name, size: 11), slashed: false)
+    }
+
+    /// Calm and monochrome while all is well, coloured once something needs attention.
+    private static func style(for level: GaugeLevel) -> GaugeIcon.Style {
+        switch level {
+        case .ok: .template
+        case .warning: .tinted(.systemOrange)
+        case .down: .tinted(.systemRed)
+        }
     }
 
     static func accessibilityLabel(for state: StatusItemState) -> String {
@@ -177,25 +187,27 @@ private enum StatusIcon {
         }
     }
 
+    /// Label colour, so the badge stays visible inside a coloured gauge; template images ignore it.
     private static func symbol(_ name: String, size: CGFloat) -> NSImage? {
         NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: size, weight: .semibold))
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: size, weight: .semibold)
+                .applying(NSImage.SymbolConfiguration(paletteColors: [.labelColor])))
     }
 
     private static func composite(_ base: NSImage, badge: NSImage?, slashed: Bool) -> NSImage {
         let gap: CGFloat = 2
         let badgeWidth = badge.map { $0.size.width + gap } ?? 0
         let size = NSSize(width: base.size.width + badgeWidth, height: base.size.height)
-        let image = NSImage(size: size)
-        image.lockFocus()
-        base.draw(in: NSRect(origin: .zero, size: base.size))
-        if slashed { drawSlash(in: NSRect(origin: .zero, size: base.size)) }
-        if let badge {
-            let origin = NSPoint(x: base.size.width + gap, y: (size.height - badge.size.height) / 2)
-            badge.draw(in: NSRect(origin: origin, size: badge.size))
+        let image = NSImage(size: size, flipped: false) { _ in
+            base.draw(in: NSRect(origin: .zero, size: base.size))
+            if slashed { drawSlash(in: NSRect(origin: .zero, size: base.size)) }
+            if let badge {
+                let origin = NSPoint(x: base.size.width + gap, y: (size.height - badge.size.height) / 2)
+                badge.draw(in: NSRect(origin: origin, size: badge.size))
+            }
+            return true
         }
-        image.unlockFocus()
-        image.isTemplate = true
+        image.isTemplate = base.isTemplate
         return image
     }
 

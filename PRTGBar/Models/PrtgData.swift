@@ -101,9 +101,10 @@ struct PrtgObject: Codable, Identifiable, Equatable {
     let active: Bool?
     let sensorStatusSummary: StatusSummary?
     let lastDown: Date?
+    var lastValue: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, kind, status, message, parent, tags, active, lastDown
+        case id, name, kind, status, message, parent, tags, active, lastDown, lastValue
         case sensorStatusSummary = "sensor_status_summary"
     }
 }
@@ -134,6 +135,8 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
     let status: SensorStatus
     let message: String?
     let lastDown: Date?
+    /// PRTG's formatted last reading, e.g. "8 msec".
+    let lastValue: String?
     var children: [TreeNode]
 
     var isAcknowledged: Bool { SensorMessage(message ?? "").isAcknowledged }
@@ -145,6 +148,7 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
         status: SensorStatus,
         message: String? = nil,
         lastDown: Date? = nil,
+        lastValue: String? = nil,
         children: [TreeNode] = []
     ) {
         self.id = id
@@ -153,6 +157,7 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
         self.status = status
         self.message = message
         self.lastDown = lastDown
+        self.lastValue = lastValue
         self.children = children
     }
 
@@ -247,7 +252,8 @@ enum TreeBuilder {
                 kind: obj.kind,
                 status: obj.status ?? .unknown,
                 message: obj.message,
-                lastDown: obj.lastDown
+                lastDown: obj.lastDown,
+                lastValue: obj.lastValue
             )
         }
 

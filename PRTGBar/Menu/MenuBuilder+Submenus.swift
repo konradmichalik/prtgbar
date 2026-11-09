@@ -29,6 +29,7 @@ extension MenuBuilder.Context {
             statusLine: statusLine(row),
             statusColor: MenuGlyph(status: row.status).color,
             message: row.message,
+            lastValue: row.lastValue,
             history: model.showHistory ? history(row.id) : nil,
             breadcrumb: row.breadcrumb
         )
@@ -147,11 +148,7 @@ extension MenuBuilder.Context {
             attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.secondaryLabelColor]
         )
         item.submenu = LazyMenu {
-            device.sensors.map { sensor in
-                let entry = action(sensor.name) { $0.open(objectId: sensor.id) }
-                entry.image = MenuGlyph(status: sensor.status).image
-                return entry
-            }
+            device.sensors.map { sensorItem(row(node: $0), showDevice: false) }
         }
         return item
     }
@@ -172,7 +169,8 @@ extension MenuBuilder.Context {
             deviceName: "",
             breadcrumb: "",
             since: node.lastDown,
-            isAcknowledged: false
+            isAcknowledged: false,
+            lastValue: node.lastValue
         )
     }
 

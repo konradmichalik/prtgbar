@@ -137,6 +137,7 @@ enum MenuBuilder {
         let breadcrumb: String
         let since: Date?
         let isAcknowledged: Bool
+        var lastValue: String?
     }
 
     @MainActor
@@ -210,7 +211,7 @@ extension MenuBuilder.Context {
         item.attributedTitle = Self.rowTitle(
             MenuText.truncated(row.name, max: 40),
             secondary: showDevice && !row.deviceName.isEmpty ? MenuText.truncated(row.deviceName, max: 24) : nil,
-            trailing: row.since.map { formatDuration(now.timeIntervalSince($0)) },
+            trailing: row.since.map { formatDuration(now.timeIntervalSince($0)) } ?? row.lastValue,
             column: trailingColumn
         )
         item.image = (row.isAcknowledged ? MenuGlyph.acknowledged : MenuGlyph(status: row.status)).image

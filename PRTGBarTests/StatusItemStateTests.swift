@@ -59,13 +59,26 @@ final class StatusItemStateTests: XCTestCase {
         XCTAssertEqual(StatusItemState.unreachable.countText, "")
     }
 
-    func testHiddenDownCountStillShowsBadge() {
-        XCTAssertEqual(StatusItemState.down(0).badgeSymbol, "xmark.circle.fill")
-        XCTAssertNil(StatusItemState.down(2).badgeSymbol)
-        XCTAssertNil(StatusItemState.allUp.badgeSymbol)
-        XCTAssertNil(StatusItemState.unreachable.badgeSymbol)
-        XCTAssertEqual(StatusItemState.warningsOnly(0).badgeSymbol, "exclamationmark.triangle.fill")
+    func testOnlySnoozeKeepsABadge() {
         XCTAssertEqual(StatusItemState.snoozed(downCount: 1).badgeSymbol, "bell.slash")
+        for state in [StatusItemState.allUp, .warningsOnly(0), .warningsOnly(3), .down(0), .down(2), .unreachable] {
+            XCTAssertNil(state.badgeSymbol, "\(state): the gauge itself shows the state")
+        }
+    }
+
+    func testGaugeLevelFollowsTheWorstState() {
+        XCTAssertEqual(StatusItemState.allUp.gaugeLevel, .ok)
+        XCTAssertEqual(StatusItemState.unreachable.gaugeLevel, .ok)
+        XCTAssertEqual(StatusItemState.warningsOnly(0).gaugeLevel, .warning)
+        XCTAssertEqual(StatusItemState.down(0).gaugeLevel, .down, "a hidden count still turns the gauge to down")
+        XCTAssertEqual(StatusItemState.snoozed(downCount: 2).gaugeLevel, .down)
+        XCTAssertEqual(StatusItemState.snoozed(downCount: 0).gaugeLevel, .ok)
+    }
+
+    func testSummaryGaugeLevel() {
+        XCTAssertEqual(GaugeLevel(StatusSummary(up: 3, down: 0, warning: 0, paused: 0, unknown: 0)), .ok)
+        XCTAssertEqual(GaugeLevel(StatusSummary(up: 3, down: 0, warning: 1, paused: 0, unknown: 0)), .warning)
+        XCTAssertEqual(GaugeLevel(StatusSummary(up: 3, down: 1, warning: 1, paused: 0, unknown: 0)), .down)
     }
 
     // MARK: - Helpers

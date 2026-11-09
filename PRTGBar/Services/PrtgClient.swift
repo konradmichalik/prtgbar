@@ -62,9 +62,10 @@ private struct V1Row: Decodable {
     let unusualsensRaw: Int?
     let lastdownRaw: Double?
     let downtimesinceRaw: Int?
+    let lastvalue: String?
 
     enum CodingKeys: String, CodingKey {
-        case objid, name, parentid, tags
+        case objid, name, parentid, tags, lastvalue
         case statusRaw = "status_raw"
         case messageRaw = "message_raw"
         case activeRaw = "active_raw"
@@ -91,6 +92,7 @@ private struct V1Row: Decodable {
         warnsensRaw = try c.decodeIfPresent(Int.self, forKey: .warnsensRaw)
         pausedsensRaw = try c.decodeIfPresent(Int.self, forKey: .pausedsensRaw)
         unusualsensRaw = try c.decodeIfPresent(Int.self, forKey: .unusualsensRaw)
+        lastvalue = try? c.decodeIfPresent(String.self, forKey: .lastvalue)
         // downtimesince_raw may be Int, String, or absent depending on sensor state
         if let val = try? c.decodeIfPresent(Int.self, forKey: .downtimesinceRaw) {
             downtimesinceRaw = val
@@ -201,7 +203,7 @@ enum PrtgClient {
         let columns: String
         switch kind {
         case .sensor:
-            columns = "objid,name,status,message,parentid,tags,active,lastdown,downtimesince"
+            columns = "objid,name,status,message,parentid,tags,active,lastdown,downtimesince,lastvalue"
         default:
             columns = "objid,name,status,parentid,tags,active,upsens,downsens,warnsens,pausedsens,unusualsens"
         }
@@ -218,7 +220,10 @@ enum PrtgClient {
         )
 
         let data = try await performRequest(url: url, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts)
+        return try decodeTable(data, kind: kind)
+    }
 
+    static func decodeTable(_ data: Data, kind: ObjectKind) throws -> [PrtgObject] {
         do {
             let response = try JSONDecoder().decode(V1TableResponse.self, from: data)
             return response.items.map { mapV1Row($0, kind: kind) }
@@ -278,7 +283,8 @@ enum PrtgClient {
             tags: tags,
             active: active,
             sensorStatusSummary: summary,
-            lastDown: lastDown
+            lastDown: lastDown,
+            lastValue: kind == .sensor ? row.lastvalue : nil
         )
     }
 
