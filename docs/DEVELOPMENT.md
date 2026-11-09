@@ -56,6 +56,7 @@ PRTGBar/
 │   ├── StatusItemController.swift  NSStatusItem, menu actions, rebuild on open
 │   ├── StatusItemState.swift       Icon and badge state from the menu model
 │   ├── GaugeIcon.swift             Drawn PRTG gauge whose needle points at the current state
+│   ├── MenuGlyph.swift             Status glyphs in the PRTG colours
 │   ├── MenuModel.swift             Immutable snapshot the menu is built from
 │   ├── MenuBuilder.swift           Native NSMenu: problems, projects, footer, lazy submenus
 │   ├── MenuBuilder+Submenus.swift  Sensor, project, acknowledged and snooze submenus
