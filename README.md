@@ -14,11 +14,7 @@
 
 </div>
 
-PRTGBar sits in your macOS menu bar and shows all down and warning sensors from your PRTG instance at a glance. Problems come first, projects sit one click away, and notifications stay calm.
-
-<div align="center">
-  <img src="docs/images/screenshot.jpg" alt="PRTGBar Screenshot" width="600">
-</div>
+PRTGBar sits in your macOS menu bar and shows all down and warning sensors from your PRTG instance at a glance. Problems come first, projects sit one click away, and notifications stay calm. See it in action on the [website](https://konradmichalik.github.io/prtgbar/).
 
 > [!NOTE]
 > PRTGBar uses the **PRTG v1 REST API** (`/api/table.json`) with an API token for authentication. PRTG 22+ with API access enabled is required.
