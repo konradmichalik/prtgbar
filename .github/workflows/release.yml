@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -64,6 +65,8 @@ jobs:
 
   release:
     needs: build
+    # Manual runs only build the DMGs for testing, without a release or Homebrew update.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
