@@ -142,6 +142,8 @@ enum MenuBuilder {
         let now: Date
         let problemsById: [Int: ProblemItem]
         let devicesById: [Int: (project: Project, device: ProjectDevice)]
+        /// One right-aligned column for durations and counts, so they line up across rows.
+        let trailingColumn: CGFloat
 
         init(model: MenuModel, history: @escaping (Int) -> HistorySummary?, actions: MenuActions, now: Date) {
             self.model = model
@@ -150,6 +152,9 @@ enum MenuBuilder {
             self.now = now
             let problems = model.problems.down + model.problems.warning + model.problems.acknowledged
             problemsById = Dictionary(problems.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let leading = problems.map { MenuText.truncated($0.sensorName, max: 40) }
+                + model.projects.map { "\(MenuText.truncated($0.name, max: 40))  · \(MenuText.truncated($0.probeName, max: 24))" }
+            trailingColumn = Self.column(fitting: leading)
             devicesById = Dictionary(
                 model.projects.flatMap { project in project.devices.map { ($0.id, (project, $0)) } },
                 uniquingKeysWith: { first, _ in first }
@@ -200,7 +205,8 @@ extension MenuBuilder.Context {
         item.attributedTitle = Self.rowTitle(
             MenuText.truncated(row.name, max: 40),
             secondary: showDevice && !row.deviceName.isEmpty ? MenuText.truncated(row.deviceName, max: 24) : nil,
-            trailing: row.since.map { formatDuration(now.timeIntervalSince($0)) }
+            trailing: row.since.map { formatDuration(now.timeIntervalSince($0)) },
+            column: trailingColumn
         )
         item.image = (row.isAcknowledged ? MenuGlyph.acknowledged : MenuGlyph(status: row.status)).image
         item.submenu = LazyMenu { sensorDetailItems(row) }
@@ -220,7 +226,18 @@ extension MenuBuilder.Context {
         )
     }
 
-    static func rowTitle(_ primary: String, secondary: String? = nil, trailing: String? = nil) -> NSAttributedString {
+    static let trailingGap: CGFloat = 60
+
+    static func column(fitting texts: [String]) -> CGFloat {
+        let font = NSFont.menuFont(ofSize: 0)
+        let widest = texts.map { NSAttributedString(string: $0, attributes: [.font: font]).size().width }.max() ?? 0
+        return max(MenuLayout.headerWidth - 50, widest + trailingGap)
+    }
+
+    static func rowTitle(
+        _ primary: String, secondary: String? = nil, trailing: String? = nil,
+        column: CGFloat = MenuLayout.headerWidth - 50
+    ) -> NSAttributedString {
         let font = NSFont.menuFont(ofSize: 0)
         let muted: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
         let title = NSMutableAttributedString(string: primary, attributes: [.font: font])
@@ -233,7 +250,7 @@ extension MenuBuilder.Context {
             title.append(NSAttributedString(string: "\t\(trailing)", attributes: muted))
         }
         let paragraph = NSMutableParagraphStyle()
-        let tabLocation = max(MenuLayout.headerWidth - 50, leadingWidth + 60)
+        let tabLocation = max(column, leadingWidth + trailingGap)
         paragraph.tabStops = [NSTextTab(textAlignment: .right, location: tabLocation)]
         title.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: title.length))
         return title
@@ -304,7 +321,8 @@ extension MenuBuilder.Context {
         item.attributedTitle = Self.rowTitle(
             MenuText.truncated(project.name, max: 40),
             secondary: hasProbeSuffix ? "· \(MenuText.truncated(project.probeName, max: 24))" : nil,
-            trailing: counts
+            trailing: counts,
+            column: trailingColumn
         )
         item.image = MenuGlyph(status: project.worstStatus).image
         item.submenu = LazyMenu { projectItems(project) }

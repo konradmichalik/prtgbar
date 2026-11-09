@@ -8,6 +8,8 @@ struct ProjectDevice: Identifiable, Equatable {
     /// Subgroup names between the project and the device.
     let path: [String]
     let problemSensors: [TreeNode]
+    /// Every sensor of the device, sorted by name.
+    let sensors: [TreeNode]
     let upCount: Int
     let pausedCount: Int
 
@@ -130,6 +132,7 @@ enum ProjectBuilder {
             name: node.name,
             path: path,
             problemSensors: problems,
+            sensors: sensors.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
             upCount: sensors.filter { $0.status == .up }.count,
             pausedCount: sensors.filter { $0.status == .paused }.count
         )

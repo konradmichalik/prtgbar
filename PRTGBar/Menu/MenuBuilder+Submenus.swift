@@ -55,7 +55,7 @@ extension MenuBuilder.Context {
         let deviceItems = project.devices.flatMap { device in
             [NSMenuItem.sectionHeader(title: MenuText.truncated(device.heading))]
                 + device.problemSensors.map { sensorItem(row(node: $0), showDevice: false) }
-                + [quietItem(device.quietSummary)]
+                + [allSensorsItem(device)]
         }
         return [headerItem(header)] + deviceItems + [
             .separator(),
@@ -137,6 +137,23 @@ extension MenuBuilder.Context {
             },
             action("Indefinitely") { $0.pause(objectId: objectId, minutes: nil) },
         ])
+    }
+
+    /// The quiet summary line opens a flat list of every sensor; a click opens the sensor in PRTG.
+    private func allSensorsItem(_ device: ProjectDevice) -> NSMenuItem {
+        let item = NSMenuItem(title: device.quietSummary, action: nil, keyEquivalent: "")
+        item.attributedTitle = NSAttributedString(
+            string: device.quietSummary,
+            attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.secondaryLabelColor]
+        )
+        item.submenu = LazyMenu {
+            device.sensors.map { sensor in
+                let entry = action(sensor.name) { $0.open(objectId: sensor.id) }
+                entry.image = MenuGlyph(status: sensor.status).image
+                return entry
+            }
+        }
+        return item
     }
 
     private func quietItem(_ title: String) -> NSMenuItem {

@@ -63,6 +63,30 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(style.tabStops.first).location, leading.size().width)
     }
 
+    func testDurationsShareOneColumn() throws {
+        let long = String(repeating: "W", count: 40)
+        let web = TreeNode(id: 100, name: "web", kind: .device, status: .down, children: [
+            TreeNode(id: 1, name: "A", kind: .sensor, status: .down, lastDown: Date().addingTimeInterval(-60)),
+            TreeNode(id: 2, name: long, kind: .sensor, status: .down, lastDown: Date().addingTimeInterval(-120)),
+        ])
+        let menu = build(MenuModel.make(MenuModel.Input(
+            roots: [TreeNode(id: 10, name: "Shop", kind: .group, status: .down, children: [web])],
+            serverURL: "https://prtg.example.com", hasAPIKey: true, lastUpdated: Date()
+        )))
+        func column(_ item: NSMenuItem) throws -> CGFloat {
+            let title = try XCTUnwrap(item.attributedTitle)
+            let style = try XCTUnwrap(title.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+            return try XCTUnwrap(style.tabStops.first).location
+        }
+
+        let down = index(of: "DOWN", in: menu)
+        let short = try column(menu.items[down + 2])
+        let wide = try column(menu.items[down + 3])
+        XCTAssertEqual(short, wide)
+        let longWidth = NSAttributedString(string: long, attributes: [.font: NSFont.menuFont(ofSize: 0)]).size().width
+        XCTAssertGreaterThan(short, longWidth)
+    }
+
     func testKeyEquivalents() {
         let menu = build(makeModel())
 
@@ -80,11 +104,23 @@ final class MenuBuilderTests: XCTestCase {
         let heading = try XCTUnwrap(shop.items.first { $0.isSectionHeader })
         XCTAssertEqual(heading.title, "web-01")
         let quiet = try XCTUnwrap(shop.items.first { $0.title == "1 more up, 1 paused" })
-        XCTAssertFalse(quiet.isEnabled)
+        let allSensors = populated(try XCTUnwrap(quiet.submenu))
+        XCTAssertEqual(allSensors.items.map(\.title), ["CPU", "Disk Free", "HTTP", "Ping"])
+        XCTAssertTrue(allSensors.items.allSatisfy { $0.submenu == nil && $0.action != nil })
         XCTAssertNotNil(shop.items.first { $0.title == "Open Project in PRTG" })
 
         let office = populated(try XCTUnwrap(project("Office", in: menu)?.submenu))
-        XCTAssertNotNil(office.items.first { $0.title == "All 1 sensor up" })
+        XCTAssertNotNil(office.items.first { $0.title == "All 1 sensor up" }?.submenu)
+    }
+
+    func testOpeningASensorFromTheDeviceList() throws {
+        let actions = RecordingActions()
+        let menu = MenuBuilder.build(makeModel(), history: { _ in nil }, actions: actions)
+        let office = populated(try XCTUnwrap(project("Office", in: menu)?.submenu))
+        let list = populated(try XCTUnwrap(office.items.first { $0.title == "All 1 sensor up" }?.submenu))
+
+        trigger(try XCTUnwrap(list.items.first { $0.title == "Ping" }))
+        XCTAssertEqual(actions.opened, [6])
     }
 
     func testSensorSubmenuActions() throws {
@@ -287,7 +323,8 @@ private final class RecordingActions: MenuActions {
     func refresh() { refreshCount += 1 }
     func openSettings() {}
     func quit() {}
-    func open(objectId: Int) {}
+    var opened: [Int] = []
+    func open(objectId: Int) { opened.append(objectId) }
     func acknowledge(sensorIds: [Int]) { acknowledged.append(sensorIds) }
     func pause(objectId: Int, minutes: Int?) { paused.append((objectId, minutes)) }
     func copy(_ text: String) { copied.append(text) }
