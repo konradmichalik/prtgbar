@@ -100,6 +100,18 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertTrue(menu.items[acknowledged - 1].isSeparatorItem)
     }
 
+    func testMutedColourKeepsContrastInBothAppearances() throws {
+        for (name, expected) in [(NSAppearance.Name.aqua, 0.30), (.darkAqua, 0.80)] {
+            let appearance = try XCTUnwrap(NSAppearance(named: name))
+            var white: CGFloat = -1
+            appearance.performAsCurrentDrawingAppearance {
+                white = MenuColor.muted.usingColorSpace(.genericGamma22Gray)?.whiteComponent ?? -1
+            }
+            XCTAssertEqual(white, expected, accuracy: 0.01, "\(name)")
+        }
+        XCTAssertEqual(MenuText.muted("x").attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, MenuColor.muted)
+    }
+
     func testKeyEquivalents() {
         let menu = build(makeModel())
 

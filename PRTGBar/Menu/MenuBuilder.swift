@@ -214,7 +214,7 @@ extension MenuBuilder.Context {
         column: CGFloat = MenuLayout.headerWidth - 50
     ) -> NSAttributedString {
         let font = NSFont.menuFont(ofSize: 0)
-        let muted: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
+        let muted: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: MenuColor.muted]
         let title = NSMutableAttributedString(string: primary, attributes: [.font: font])
         if let secondary {
             title.append(NSAttributedString(string: "  \(secondary)", attributes: muted))

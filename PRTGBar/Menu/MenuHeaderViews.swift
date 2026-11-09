@@ -32,7 +32,7 @@ struct SummaryHeaderView: View {
                         Text(host).lineLimit(1).truncationMode(.middle)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color(nsColor: MenuColor.muted))
                     .help("Open PRTG")
                 }
                 HStack(spacing: 6) {
@@ -52,7 +52,7 @@ struct SummaryHeaderView: View {
     }
 
     private var summaryLine: Text {
-        guard hasData else { return Text("Loading…").foregroundColor(.secondary) }
+        guard hasData else { return Text("Loading…").foregroundColor(Color(nsColor: MenuColor.muted)) }
         return StatusSummaryText.make(summary)
     }
 }
@@ -67,7 +67,7 @@ enum StatusSummaryText {
         }
         let parts = MenuText.summaryParts(summary).map { glyphPart($0.glyph, $0.text) }
         return parts.dropFirst().reduce(parts.first ?? Text("")) { line, part in
-            line + Text(" · ").foregroundColor(.secondary) + part
+            line + Text(" · ").foregroundColor(Color(nsColor: MenuColor.muted)) + part
         }
     }
 
@@ -85,7 +85,7 @@ struct PathLineView: View {
     var body: some View {
         Text(text)
             .fontWeight(emphasized ? .semibold : .regular)
-            .foregroundStyle(emphasized ? .primary : .secondary)
+            .foregroundStyle(emphasized ? Color.primary : Color(nsColor: MenuColor.muted))
             .lineLimit(1)
             .truncationMode(.middle)
             .padding(.horizontal, 14)
@@ -106,7 +106,7 @@ struct ProjectHeaderView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(name).font(.headline).lineLimit(1).truncationMode(.middle)
             StatusSummaryText.make(summary).font(.callout)
-            Text(detail).font(.callout).foregroundStyle(.secondary)
+            Text(detail).font(.callout).foregroundStyle(Color(nsColor: MenuColor.muted))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
@@ -130,16 +130,16 @@ struct SensorDetailHeaderView: View {
             Text(name).font(.headline).lineLimit(2)
             Text(statusLine).font(.callout).foregroundStyle(Color(nsColor: statusColor))
             if let message, !message.isEmpty {
-                Text(message).font(.callout).foregroundStyle(.secondary).lineLimit(3)
+                Text(message).font(.callout).foregroundStyle(Color(nsColor: MenuColor.muted)).lineLimit(3)
             }
             if let lastValue, !lastValue.isEmpty {
-                Text("Last value: \(lastValue)").font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                Text("Last value: \(lastValue)").font(.callout).foregroundStyle(Color(nsColor: MenuColor.muted)).lineLimit(1)
             }
             if let history {
                 UptimeStripView(segments: history.segments).padding(.top, 2)
-                Text(Self.historyLine(history)).font(.caption).foregroundStyle(.secondary)
+                Text(Self.historyLine(history)).font(.caption).foregroundStyle(Color(nsColor: MenuColor.muted))
             }
-            Text(breadcrumb).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            Text(breadcrumb).font(.caption).foregroundStyle(Color(nsColor: MenuColor.muted)).lineLimit(1).truncationMode(.middle)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
@@ -175,7 +175,7 @@ struct UptimeStripView: View {
         case .unusual: Color(nsColor: MenuGlyph.unusual.color)
         case .paused: Color(nsColor: MenuGlyph.paused.color)
         case .down: Color(nsColor: MenuGlyph.down.color)
-        case .noData: Color(nsColor: .quaternaryLabelColor)
+        case .noData: Color(nsColor: MenuColor.faint)
         }
     }
 }

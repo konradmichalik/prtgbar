@@ -1,5 +1,21 @@
 import AppKit
 
+/// System label colours draw with vibrancy in menus and fade into the translucent background.
+/// Fixed greys that only follow light and dark mode keep their contrast.
+enum MenuColor {
+    static let muted = NSColor(name: "PRTGBarMuted") { appearance in
+        NSColor(white: isDark(appearance) ? 0.80 : 0.30, alpha: 1)
+    }
+
+    static let faint = NSColor(name: "PRTGBarFaint") { appearance in
+        NSColor(white: isDark(appearance) ? 0.45 : 0.72, alpha: 1)
+    }
+
+    private static func isDark(_ appearance: NSAppearance) -> Bool {
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    }
+}
+
 enum MenuGlyph {
     case down, warning, unusual, up, paused, acknowledged
 
@@ -32,7 +48,7 @@ enum MenuGlyph {
         case .unusual: .systemOrange
         case .up: .systemGreen
         case .paused: .systemBlue
-        case .acknowledged: .secondaryLabelColor
+        case .acknowledged: MenuColor.muted
         }
     }
 

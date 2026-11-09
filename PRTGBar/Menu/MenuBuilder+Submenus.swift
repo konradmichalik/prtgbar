@@ -132,10 +132,10 @@ extension MenuBuilder.Context {
     private func sectionTitle(_ heading: String, suffix: String) -> NSAttributedString {
         let font = NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)
         let title = NSMutableAttributedString(
-            string: heading, attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor])
+            string: heading, attributes: [.font: font, .foregroundColor: MenuColor.muted])
         title.append(NSAttributedString(
             string: " · \(MenuText.truncated(suffix, max: 24))",
-            attributes: [.font: font, .foregroundColor: NSColor.tertiaryLabelColor]))
+            attributes: [.font: font, .foregroundColor: MenuColor.faint]))
         return title
     }
 

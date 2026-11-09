@@ -3,7 +3,7 @@ import AppKit
 enum MenuText {
     static func muted(_ text: String) -> NSAttributedString {
         NSAttributedString(string: text, attributes: [
-            .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.secondaryLabelColor,
+            .font: NSFont.menuFont(ofSize: 0), .foregroundColor: MenuColor.muted,
         ])
     }
 
