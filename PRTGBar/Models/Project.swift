@@ -16,15 +16,6 @@ struct ProjectDevice: Identifiable, Equatable {
     var heading: String {
         ProjectBuilder.heading(path: path, deviceName: name)
     }
-
-    var quietSummary: String {
-        switch (problemSensors.isEmpty, pausedCount > 0) {
-        case (true, false): "All \(MenuText.count(upCount, "sensor")) up"
-        case (true, true): "\(upCount) up, \(pausedCount) paused"
-        case (false, true): "\(upCount) more up, \(pausedCount) paused"
-        case (false, false): "\(upCount) more up"
-        }
-    }
 }
 
 // MARK: - Project

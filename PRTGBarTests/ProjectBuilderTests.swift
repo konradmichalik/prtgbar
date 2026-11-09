@@ -177,22 +177,4 @@ final class ProjectBuilderTests: XCTestCase {
         XCTAssertEqual(ProjectBuilder.projectName(ancestors: [probeNode, top], level: 2), "Kunde A")
         XCTAssertEqual(ProjectBuilder.subgroupPath(ancestors: [probeNode, top, nested], level: 2), [])
     }
-
-    // MARK: - Quiet Summary
-
-    func testQuietSummaryCopy() {
-        func summary(problems: [TreeNode], up: Int, paused: Int) -> String {
-            let sensors = problems
-                + (0..<up).map { sensor(2000 + $0, .up) }
-                + (0..<paused).map { sensor(3000 + $0, .paused) }
-            let roots = [probe(1, "P", children: [group(10, "G", children: [device(100, "d", sensors: sensors)])])]
-            return ProjectBuilder.projects(from: roots)[0].devices[0].quietSummary
-        }
-
-        XCTAssertEqual(summary(problems: [], up: 5, paused: 0), "All 5 sensors up")
-        XCTAssertEqual(summary(problems: [], up: 1, paused: 0), "All 1 sensor up")
-        XCTAssertEqual(summary(problems: [], up: 5, paused: 2), "5 up, 2 paused")
-        XCTAssertEqual(summary(problems: [sensor(1, .down)], up: 5, paused: 2), "5 more up, 2 paused")
-        XCTAssertEqual(summary(problems: [sensor(1, .down)], up: 5, paused: 0), "5 more up")
-    }
 }

@@ -109,32 +109,28 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(item("Quit PRTGBar", in: menu)?.keyEquivalent, "q")
     }
 
-    func testProjectSubmenuHasDeviceHeadingsAndQuietLine() throws {
+    func testProjectSubmenuListsEverySensorUnderItsDevice() throws {
         let menu = build(makeModel())
         let shop = populated(try XCTUnwrap(project("Shop", in: menu)?.submenu))
 
         XCTAssertNotNil(shop.items.first?.view, "project header view")
-        let heading = try XCTUnwrap(shop.items.first { $0.isSectionHeader })
-        XCTAssertEqual(heading.title, "web-01")
-        let quiet = try XCTUnwrap(shop.items.first { $0.title == "1 more up, 1 paused" })
-        let allSensors = populated(try XCTUnwrap(quiet.submenu))
-        XCTAssertEqual(allSensors.items.map { $0.title.components(separatedBy: "\t")[0] }, ["CPU", "Disk Free", "HTTP", "Ping"])
-        XCTAssertTrue(allSensors.items.allSatisfy { $0.submenu != nil }, "every sensor has its detail submenu")
-        let ping = try XCTUnwrap(allSensors.items.first { $0.title.hasPrefix("Ping") })
-        XCTAssertEqual(ping.title, "Ping\t12 msec", "last value in the trailing column")
+        let heading = try XCTUnwrap(shop.items.firstIndex { $0.isSectionHeader })
+        XCTAssertEqual(shop.items[heading].title, "web-01")
+        let sensors = shop.items[(heading + 1)...].prefix { !$0.isSeparatorItem && !$0.isSectionHeader }
+        XCTAssertEqual(sensors.map { $0.title.components(separatedBy: "\t")[0] }, ["HTTP", "Disk Free", "CPU", "Ping"],
+                       "problems first, then the rest by name")
+        XCTAssertTrue(sensors.allSatisfy { $0.submenu != nil }, "every sensor has its detail submenu")
+        XCTAssertEqual(sensors.last?.title, "Ping\t12 msec", "last value in the trailing column")
+        XCTAssertFalse(shop.items.contains { $0.title.contains("more up") })
         XCTAssertNotNil(shop.items.first { $0.title == "Open Project in PRTG" })
-
-        let office = populated(try XCTUnwrap(project("Office", in: menu)?.submenu))
-        XCTAssertNotNil(office.items.first { $0.title == "All 1 sensor up" }?.submenu)
     }
 
-    func testOpeningASensorFromTheDeviceList() throws {
+    func testOpeningAHealthySensorFromTheProject() throws {
         let actions = RecordingActions()
         let menu = MenuBuilder.build(makeModel(), history: { _ in nil }, actions: actions)
         let office = populated(try XCTUnwrap(project("Office", in: menu)?.submenu))
-        let list = populated(try XCTUnwrap(office.items.first { $0.title == "All 1 sensor up" }?.submenu))
 
-        let detail = populated(try XCTUnwrap(list.items.first { $0.title.hasPrefix("Ping") }?.submenu))
+        let detail = populated(try XCTUnwrap(office.items.first { $0.title.hasPrefix("Ping") }?.submenu))
         XCTAssertNil(detail.items.first { $0.title == "Acknowledge…" }, "nothing to acknowledge on an up sensor")
         trigger(try XCTUnwrap(detail.items.first { $0.title == "Open in PRTG" }))
         XCTAssertEqual(actions.opened, [6])
@@ -202,9 +198,9 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(requested, [1])
     }
 
-    func testNoMoreThanThreeSubmenuLevels() {
+    func testNoMoreThanTwoSubmenuLevels() {
         let menu = build(makeModel())
-        XCTAssertLessThanOrEqual(depth(of: menu), 3)
+        XCTAssertLessThanOrEqual(depth(of: menu), 2)
     }
 
     func testAcknowledgedAndPausedSubmenu() throws {

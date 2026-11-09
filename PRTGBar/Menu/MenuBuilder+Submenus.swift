@@ -50,13 +50,21 @@ extension MenuBuilder.Context {
         let devices = MenuText.count(project.devices.count, "device")
         let header = ProjectHeaderView(
             name: project.displayName,
+            summary: StatusSummary(
+                up: project.devices.reduce(0) { $0 + $1.upCount },
+                down: project.downCount,
+                warning: project.warningCount,
+                paused: project.devices.reduce(0) { $0 + $1.pausedCount },
+                unknown: 0
+            ),
             detail: [project.probeName, devices, MenuText.count(project.sensorCount, "sensor")]
                 .filter { !$0.isEmpty }.joined(separator: " · ")
         )
         let deviceItems = project.devices.flatMap { device in
-            [NSMenuItem.sectionHeader(title: MenuText.truncated(device.heading))]
-                + device.problemSensors.map { sensorItem(row(node: $0), showDevice: false) }
-                + [allSensorsItem(device)]
+            let problemIds = Set(device.problemSensors.map(\.id))
+            let others = device.sensors.filter { !problemIds.contains($0.id) }
+            return [NSMenuItem.sectionHeader(title: MenuText.truncated(device.heading))]
+                + (device.problemSensors + others).map { sensorItem(row(node: $0), showDevice: false) }
         }
         return [headerItem(header)] + deviceItems + [
             .separator(),
@@ -138,19 +146,6 @@ extension MenuBuilder.Context {
             },
             action("Indefinitely") { $0.pause(objectId: objectId, minutes: nil) },
         ])
-    }
-
-    /// The quiet summary line opens a flat list of every sensor; a click opens the sensor in PRTG.
-    private func allSensorsItem(_ device: ProjectDevice) -> NSMenuItem {
-        let item = NSMenuItem(title: device.quietSummary, action: nil, keyEquivalent: "")
-        item.attributedTitle = NSAttributedString(
-            string: device.quietSummary,
-            attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.secondaryLabelColor]
-        )
-        item.submenu = LazyMenu {
-            device.sensors.map { sensorItem(row(node: $0), showDevice: false) }
-        }
-        return item
     }
 
     private func quietItem(_ title: String) -> NSMenuItem {

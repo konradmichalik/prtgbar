@@ -15,8 +15,6 @@ struct SummaryHeaderView: View {
     @ObservedObject var activity: RefreshActivity
     let openServer: @MainActor () -> Void
 
-    private var isAllUp: Bool { hasData && summary.down == 0 && summary.warning == 0 }
-
     var body: some View {
         HStack(spacing: 10) {
             Image(nsImage: GaugeIcon.image(
@@ -55,7 +53,16 @@ struct SummaryHeaderView: View {
 
     private var summaryLine: Text {
         guard hasData else { return Text("Loading…").foregroundColor(.secondary) }
-        if isAllUp {
+        return StatusSummaryText.make(summary)
+    }
+}
+
+// MARK: - Status Summary
+
+/// "▲ 8 Warning · ✓ 26 Up" with status glyphs, shared by the main and the project header.
+enum StatusSummaryText {
+    static func make(_ summary: StatusSummary) -> Text {
+        if summary.down == 0, summary.warning == 0 {
             return glyphPart(.up, "All \(MenuText.count(summary.up, "sensor")) up")
         }
         let parts = MenuText.summaryParts(summary).map { glyphPart($0.glyph, $0.text) }
@@ -64,7 +71,7 @@ struct SummaryHeaderView: View {
         }
     }
 
-    private func glyphPart(_ glyph: MenuGlyph, _ text: String) -> Text {
+    private static func glyphPart(_ glyph: MenuGlyph, _ text: String) -> Text {
         Text(Image(systemName: glyph.symbolName)).foregroundColor(Color(nsColor: glyph.color)) + Text(" \(text)")
     }
 }
@@ -92,11 +99,13 @@ struct PathLineView: View {
 
 struct ProjectHeaderView: View {
     let name: String
+    let summary: StatusSummary
     let detail: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(name).font(.headline).lineLimit(1).truncationMode(.middle)
+            StatusSummaryText.make(summary).font(.callout)
             Text(detail).font(.callout).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
