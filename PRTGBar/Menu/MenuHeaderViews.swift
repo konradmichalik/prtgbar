@@ -42,7 +42,7 @@ struct SummaryHeaderView: View {
                             .controlSize(.small)
                             .accessibilityLabel("Refreshing")
                     }
-                    summaryLine.font(.callout)
+                    summaryLine.font(.callout).fixedSize(horizontal: true, vertical: false)
                 }
             }
         }
@@ -105,12 +105,13 @@ struct ProjectHeaderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(name).font(.headline).lineLimit(1).truncationMode(.middle)
-            StatusSummaryText.make(summary).font(.callout)
+            // Never wrap the counts; the header grows and the menu follows.
+            StatusSummaryText.make(summary).font(.callout).fixedSize(horizontal: true, vertical: false)
             Text(detail).font(.callout).foregroundStyle(Color(nsColor: MenuColor.muted))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-        .frame(width: MenuLayout.detailWidth, alignment: .leading)
+        .frame(minWidth: MenuLayout.detailWidth, alignment: .leading)
     }
 }
 

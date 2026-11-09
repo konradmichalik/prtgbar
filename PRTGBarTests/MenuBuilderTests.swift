@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import PRTGBar
 
@@ -110,6 +111,16 @@ final class MenuBuilderTests: XCTestCase {
             XCTAssertEqual(white, expected, accuracy: 0.01, "\(name)")
         }
         XCTAssertEqual(MenuText.muted("x").attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, MenuColor.muted)
+    }
+
+    func testProjectHeaderKeepsTheSummaryOnOneLine() {
+        func height(_ summary: StatusSummary) -> CGFloat {
+            NSHostingView(rootView: ProjectHeaderView(name: "vhw", summary: summary, detail: "8 devices · 56 sensors"))
+                .fittingSize.height
+        }
+        let short = height(StatusSummary(up: 45, down: 0, warning: 3, paused: 0, unknown: 0))
+        let long = height(StatusSummary(up: 45, down: 12, warning: 3, paused: 2, unknown: 0, unusual: 6))
+        XCTAssertEqual(long, short, accuracy: 0.5, "the summary line must not wrap")
     }
 
     func testKeyEquivalents() {
