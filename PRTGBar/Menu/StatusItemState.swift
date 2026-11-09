@@ -19,6 +19,16 @@ enum StatusItemState: Equatable {
         return .allUp
     }
 
+    /// A hidden down count still needs a mark, or down would look exactly like all up.
+    var badgeSymbol: String? {
+        switch self {
+        case .warningsOnly: "exclamationmark.triangle.fill"
+        case .down(let count): count > 0 ? nil : "xmark.circle.fill"
+        case .snoozed: "bell.slash"
+        case .allUp, .unreachable: nil
+        }
+    }
+
     var countText: String {
         switch self {
         case .warningsOnly(let count), .down(let count), .snoozed(let count):

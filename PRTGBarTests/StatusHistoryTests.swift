@@ -65,6 +65,18 @@ final class StatusHistoryTests: XCTestCase {
         XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .up)
     }
 
+    func testPausedOrUnknownAllDayRecordsNothing() {
+        let history = StatusHistory(fileURL: nil)
+        for poll in 0..<48 {
+            history.record([1: .paused, 2: .unknown], at: ago(Double(poll) * slot))
+        }
+        for id in [1, 2] {
+            let summary = history.summary(for: id, now: now)
+            XCTAssertEqual(Set(summary.segments), [.noData])
+            XCTAssertNil(summary.upRatio)
+        }
+    }
+
     func testRecordPrunesOlderThan24h() {
         let history = StatusHistory(fileURL: nil)
         history.record([1: .down], at: ago(25 * 3600))

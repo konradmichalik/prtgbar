@@ -59,6 +59,15 @@ final class StatusItemStateTests: XCTestCase {
         XCTAssertEqual(StatusItemState.unreachable.countText, "")
     }
 
+    func testHiddenDownCountStillShowsBadge() {
+        XCTAssertEqual(StatusItemState.down(0).badgeSymbol, "xmark.circle.fill")
+        XCTAssertNil(StatusItemState.down(2).badgeSymbol)
+        XCTAssertNil(StatusItemState.allUp.badgeSymbol)
+        XCTAssertNil(StatusItemState.unreachable.badgeSymbol)
+        XCTAssertEqual(StatusItemState.warningsOnly(0).badgeSymbol, "exclamationmark.triangle.fill")
+        XCTAssertEqual(StatusItemState.snoozed(downCount: 1).badgeSymbol, "bell.slash")
+    }
+
     // MARK: - Helpers
 
     private func device(statuses: [SensorStatus]) -> TreeNode {

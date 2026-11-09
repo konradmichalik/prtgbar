@@ -38,19 +38,16 @@ struct SummaryHeaderView: View {
     private var summaryLine: Text {
         guard hasData else { return Text("Waiting for data…").foregroundColor(.secondary) }
         if isAllUp {
-            let count = summary.up.formatted(.number.locale(Locale(identifier: "en_US")))
-            return Text(summary.up == 1 ? "All 1 sensor up" : "All \(count) sensors up").foregroundColor(.secondary)
+            return Text("All \(MenuText.count(summary.up, "sensor")) up").foregroundColor(.secondary)
         }
-        let parts = MenuText.summaryLine(summary).components(separatedBy: " · ").map(glyphPart)
+        let parts = MenuText.summaryParts(summary).map { glyphPart($0.glyph, $0.text) }
         return parts.dropFirst().reduce(parts.first ?? Text("")) { line, part in
             line + Text(" · ").foregroundColor(.secondary) + part
         }
     }
 
-    private func glyphPart(_ part: String) -> Text {
-        let glyph: MenuGlyph = part.hasSuffix("Down") ? .down : (part.hasSuffix("Warning") ? .warning : .up)
-        return Text(Image(systemName: glyph.symbolName)).foregroundColor(Color(nsColor: glyph.color))
-            + Text(" \(part)")
+    private func glyphPart(_ glyph: MenuGlyph, _ text: String) -> Text {
+        Text(Image(systemName: glyph.symbolName)).foregroundColor(Color(nsColor: glyph.color)) + Text(" \(text)")
     }
 }
 
@@ -101,8 +98,7 @@ struct SensorDetailHeaderView: View {
 
     static func historyLine(_ history: HistorySummary) -> String {
         guard let ratio = history.upRatio else { return "No history recorded yet" }
-        let outages = history.outageCount == 1 ? "1 outage" : "\(history.outageCount) outages"
-        return "\(Int((ratio * 100).rounded(.down)))% up · \(outages)"
+        return "\(Int((ratio * 100).rounded(.down)))% up · \(MenuText.count(history.outageCount, "outage"))"
     }
 }
 

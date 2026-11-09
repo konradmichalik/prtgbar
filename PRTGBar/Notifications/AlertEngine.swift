@@ -5,6 +5,8 @@ struct SensorSnapshot: Equatable, Sendable {
     let name: String
     let deviceId: Int
     let deviceName: String
+    /// nil when the sensor hangs outside any probe, so it groups by device instead.
+    let projectId: Int?
     let projectName: String
     let status: SensorStatus
     let isAcknowledged: Bool
@@ -19,7 +21,6 @@ struct AlertConfig: Equatable, Sendable {
     var alertOnDown = true
     var alertOnWarning = false
     var alertOnRecovery = true
-    /// 0, 1 or 2 ("Wait before alerting").
     var extraChecks = 1
     var combine: CombineMode = .perDevice
     var muteFlapping = true
@@ -27,7 +28,6 @@ struct AlertConfig: Equatable, Sendable {
     var flapWindow: TimeInterval = 900
     var flapCalm: TimeInterval = 900
     var skipAcknowledgedAndPaused = true
-    /// nil, 1800, 3600 or 14400.
     var reminderInterval: TimeInterval?
     var snoozedUntil: Date?
 }
@@ -71,7 +71,7 @@ struct AlertEngine: Sendable {
             if let event { events.append((sensor, event)) }
         }
         states = nextStates
-        if let snoozedUntil = config.snoozedUntil, now < snoozedUntil { return [] }
+        if config.isSnoozed(at: now) { return [] }
         return compose(events)
     }
 
@@ -120,15 +120,15 @@ struct AlertEngine: Sendable {
         switch config.combine {
         case .never: "sensor-\(sensor.id)"
         case .perDevice: "device-\(sensor.deviceId)"
-        case .perProject: "project-\(sensor.projectName)"
+        case .perProject: sensor.projectId.map { "project-\($0)" } ?? "device-\(sensor.deviceId)"
         }
     }
 
     private func groupAlert(_ kind: AlertKind, _ sensors: [SensorSnapshot]) -> Alert {
         let first = sensors[0]
-        let byProject = config.combine == .perProject
+        let byProject = config.combine == .perProject && first.projectId != nil
         let label = byProject ? first.projectName : first.deviceName
-        let threadId = byProject ? "project-\(first.projectName)" : "device-\(first.deviceId)"
+        let threadId = byProject ? groupKey(first) : "device-\(first.deviceId)"
         let body = sensors.count > 1
             ? sensors.map(\.name).joined(separator: ", ")
             : (kind == .recovery ? "" : first.message ?? "")

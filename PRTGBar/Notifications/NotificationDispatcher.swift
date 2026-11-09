@@ -20,12 +20,20 @@ enum NotificationDispatcher {
         center.setNotificationCategories(categories)
     }
 
-    static func content(for alert: Alert, soundEnabled: Bool) -> UNMutableNotificationContent {
+    /// Object ids are only unique per server, so actions check this against the current server first.
+    static func serverKey(_ serverURL: String) -> String {
+        serverURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
+    }
+
+    static func content(for alert: Alert, soundEnabled: Bool, server: String) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = alert.title
         content.body = alert.body
         content.threadIdentifier = alert.threadId
-        content.userInfo = ["sensorIds": alert.sensorIds, "deviceId": alert.deviceId]
+        content.userInfo = ["sensorIds": alert.sensorIds, "deviceId": alert.deviceId, "server": server]
         content.interruptionLevel = alert.kind == .recovery ? .passive : .active
         if alert.playSound && soundEnabled { content.sound = .default }
         switch alert.kind {
@@ -36,11 +44,13 @@ enum NotificationDispatcher {
         return content
     }
 
-    static func deliver(_ alerts: [Alert], soundEnabled: Bool, center: UNUserNotificationCenter = .current()) {
+    static func deliver(
+        _ alerts: [Alert], soundEnabled: Bool, server: String, center: UNUserNotificationCenter = .current()
+    ) {
         for alert in alerts {
             let request = UNNotificationRequest(
                 identifier: "\(alert.threadId)-\(UUID())",
-                content: content(for: alert, soundEnabled: soundEnabled),
+                content: content(for: alert, soundEnabled: soundEnabled, server: server),
                 trigger: nil
             )
             center.add(request)

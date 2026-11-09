@@ -32,6 +32,30 @@ final class MenuModelTests: XCTestCase {
         XCTAssertEqual(MenuText.summaryLine(quiet), "7 Up")
     }
 
+    func testSummaryPartsCarryGlyphs() {
+        let parts = MenuText.summaryParts(StatusSummary(up: 5, down: 1, warning: 2, paused: 0, unknown: 0))
+        XCTAssertEqual(parts.map(\.glyph), [.down, .warning, .up])
+        XCTAssertEqual(parts.map(\.text), ["1 Down", "2 Warning", "5 Up"])
+    }
+
+    func testCountPluralises() {
+        XCTAssertEqual(MenuText.count(1, "sensor"), "1 sensor")
+        XCTAssertEqual(MenuText.count(0, "sensor"), "0 sensors")
+        XCTAssertEqual(MenuText.count(1240, "sensor"), "1,240 sensors")
+    }
+
+    func testStatusClassification() {
+        XCTAssertEqual(SensorStatus.allCases.filter(\.isDownClass), [.down, .partialdown])
+        XCTAssertEqual(SensorStatus.allCases.filter(\.isWarningClass), [.warning, .unusual])
+    }
+
+    func testTreeNodeAcknowledged() {
+        XCTAssertTrue(TreeNode(id: 1, name: "s", kind: .sensor, status: .down,
+                               message: "Acknowledged by admin [x]: known").isAcknowledged)
+        XCTAssertFalse(TreeNode(id: 2, name: "s", kind: .sensor, status: .down, message: "Timeout").isAcknowledged)
+        XCTAssertFalse(TreeNode(id: 3, name: "s", kind: .sensor, status: .down).isAcknowledged)
+    }
+
     func testHostFromServerURL() {
         XCTAssertEqual(makeModel(serverURL: "https://prtg.example.com:8443/", roots: []).serverHost, "prtg.example.com")
         XCTAssertEqual(makeModel(serverURL: "prtg.example.com", roots: []).serverHost, "prtg.example.com")

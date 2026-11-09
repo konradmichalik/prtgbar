@@ -159,21 +159,19 @@ private enum StatusIcon {
     static func image(for state: StatusItemState) -> NSImage? {
         guard let base = NSImage(named: "MenubarIcon") else { return nil }
         base.isTemplate = true
-        switch state {
-        case .allUp, .down: return base
-        case .unreachable: return composite(base, badge: nil, slashed: true)
-        case .warningsOnly: return composite(base, badge: symbol("exclamationmark.triangle.fill", size: 8), slashed: false)
-        case .snoozed: return composite(base, badge: symbol("bell.slash", size: 11), slashed: false)
-        }
+        if state == .unreachable { return composite(base, badge: nil, slashed: true) }
+        guard let name = state.badgeSymbol else { return base }
+        let size: CGFloat = if case .snoozed = state { 11 } else { 8 }
+        return composite(base, badge: symbol(name, size: size), slashed: false)
     }
 
     static func accessibilityLabel(for state: StatusItemState) -> String {
         switch state {
         case .allUp: "PRTG: all sensors up"
         case .warningsOnly(let count):
-            count == 1 ? "PRTG: 1 warning" : (count > 0 ? "PRTG: \(count) warnings" : "PRTG: warnings")
+            count > 0 ? "PRTG: \(MenuText.count(count, "warning"))" : "PRTG: warnings"
         case .down(let count):
-            count == 1 ? "PRTG: 1 sensor down" : (count > 0 ? "PRTG: \(count) sensors down" : "PRTG: sensors down")
+            count > 0 ? "PRTG: \(MenuText.count(count, "sensor")) down" : "PRTG: sensors down"
         case .unreachable: "PRTG: server not reachable"
         case .snoozed: "PRTG: notifications snoozed"
         }

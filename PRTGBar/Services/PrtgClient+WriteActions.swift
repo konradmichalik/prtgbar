@@ -3,7 +3,7 @@ import Foundation
 extension PrtgClient {
     enum WriteAction {
         case acknowledge(id: Int, message: String?)
-        case pause(id: Int, minutes: Int?, message: String?)
+        case pause(id: Int, minutes: Int?)
     }
 
     static func acknowledgeAlarm(
@@ -43,11 +43,11 @@ extension PrtgClient {
     }
 
     static func pauseObject(
-        objectId: Int, minutes: Int?, message: String?,
+        objectId: Int, minutes: Int?,
         serverURL: String, token: String, acceptSelfSignedCerts: Bool = true
     ) async throws {
         try await perform(
-            .pause(id: objectId, minutes: minutes, message: message),
+            .pause(id: objectId, minutes: minutes),
             serverURL: serverURL, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts
         )
     }
@@ -60,7 +60,7 @@ extension PrtgClient {
             path = "/api/acknowledgealarm.htm"
             items = [URLQueryItem(name: "id", value: "\(id)")]
             if let message { items.append(URLQueryItem(name: "ackmsg", value: message)) }
-        case .pause(let id, let minutes, let message):
+        case .pause(let id, let minutes):
             items = [URLQueryItem(name: "id", value: "\(id)")]
             if let minutes {
                 path = "/api/pauseobjectfor.htm"
@@ -69,7 +69,6 @@ extension PrtgClient {
                 path = "/api/pause.htm"
                 items.append(URLQueryItem(name: "action", value: "0"))
             }
-            if let message { items.append(URLQueryItem(name: "pausemsg", value: message)) }
         }
         return try buildURL(serverURL: serverURL, path: path, token: token, queryItems: items)
     }

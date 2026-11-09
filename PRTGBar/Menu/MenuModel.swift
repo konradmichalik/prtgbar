@@ -58,8 +58,8 @@ struct MenuModel {
                 case .up: counts.up += 1
                 case .paused: counts.paused += 1
                 case .down, .partialdown, .warning, .unusual:
-                    guard !SensorMessage(node.message ?? "").isAcknowledged else { return }
-                    if node.status == .down || node.status == .partialdown {
+                    guard !node.isAcknowledged else { return }
+                    if node.status.isDownClass {
                         counts.down += 1
                     } else {
                         counts.warning += 1

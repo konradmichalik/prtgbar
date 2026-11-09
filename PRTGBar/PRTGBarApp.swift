@@ -70,10 +70,12 @@ final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate, @un
         let info = response.notification.request.content.userInfo
         let sensorIds = info["sensorIds"] as? [Int] ?? []
         let deviceId = info["deviceId"] as? Int
+        let server = info["server"] as? String
         nonisolated(unsafe) let done = handler
         Task { @MainActor in
             defer { done() }
-            guard let appState = self.appState else { return }
+            guard let appState = self.appState,
+                  server == NotificationDispatcher.serverKey(appState.serverURL) else { return }
             if action == NotificationDispatcher.acknowledgeAction {
                 await appState.acknowledge(ids: sensorIds, message: nil)
             } else if let deviceId {

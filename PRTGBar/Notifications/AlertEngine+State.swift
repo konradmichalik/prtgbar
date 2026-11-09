@@ -4,11 +4,7 @@ enum StatusClass: Int, Comparable, Sendable {
     case ok, warning, down
 
     init(_ status: SensorStatus) {
-        switch status {
-        case .down, .partialdown: self = .down
-        case .warning, .unusual: self = .warning
-        case .up, .paused, .unknown: self = .ok
-        }
+        self = status.isDownClass ? .down : (status.isWarningClass ? .warning : .ok)
     }
 
     static func < (lhs: StatusClass, rhs: StatusClass) -> Bool {
@@ -57,7 +53,8 @@ struct SensorAlertState: Equatable, Sendable {
         } else if config.muteFlapping, changed, next.changeTimes.count >= config.flapThreshold {
             next = next.resettingSpan()
             next.flappingSince = observation.now
-            return (next, .flapping(changes: next.changeTimes.count))
+            let notifies = config.flapNoticesEnabled(for: observation.effectiveClass)
+            return (next, notifies ? .flapping(changes: next.changeTimes.count) : nil)
         }
         if changed, observation.effectiveClass == .ok {
             let recovers = next.alerted && config.alertOnRecovery && observation.status == .up
@@ -102,14 +99,16 @@ struct SensorAlertState: Equatable, Sendable {
         var next = self
         let statusClass = observation.effectiveClass
         let now = observation.now
+        // A snoozed problem stays uncovered, so it alerts once when the snooze ends.
+        let snoozed = config.isSnoozed(at: now)
         if statusClass > covered, streak >= config.extraChecks + 1 {
-            guard config.alertsEnabled(for: statusClass) else { return (next, nil) }
+            guard config.alertsEnabled(for: statusClass), !snoozed else { return (next, nil) }
             next.covered = statusClass
             next.alerted = true
             if statusClass == .down { next.lastReminder = now }
             return (next, .problem(statusClass))
         }
-        guard statusClass == .down, covered == .down, alerted, !observation.isAcknowledged,
+        guard !snoozed, statusClass == .down, covered == .down, alerted, !observation.isAcknowledged,
               let interval = config.reminderInterval, let last = lastReminder,
               now.timeIntervalSince(last) >= interval else {
             return (next, nil)
@@ -126,5 +125,14 @@ extension AlertConfig {
         case .warning: alertOnWarning
         case .ok: false
         }
+    }
+
+    /// Flapping back to ok still matters to whoever gets any problem alerts.
+    func flapNoticesEnabled(for statusClass: StatusClass) -> Bool {
+        statusClass == .ok ? alertOnDown || alertOnWarning : alertsEnabled(for: statusClass)
+    }
+
+    func isSnoozed(at now: Date) -> Bool {
+        snoozedUntil.map { now < $0 } ?? false
     }
 }

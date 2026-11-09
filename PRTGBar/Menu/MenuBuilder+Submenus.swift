@@ -34,7 +34,7 @@ extension MenuBuilder.Context {
         )
         let pause = NSMenuItem(title: "Pause", action: nil, keyEquivalent: "")
         pause.submenu = pauseMenu(objectId: row.id)
-        let canAcknowledge = !row.isAcknowledged && (row.status == .down || row.status == .partialdown)
+        let canAcknowledge = !row.isAcknowledged && row.status.isDownClass
         let acknowledge = canAcknowledge ? [action("Acknowledge…") { $0.acknowledge(sensorIds: [row.id]) }] : []
         return [headerItem(header), .separator()] + acknowledge + [
             pause,
@@ -46,11 +46,10 @@ extension MenuBuilder.Context {
     }
 
     func projectItems(_ project: Project) -> [NSMenuItem] {
-        let devices = project.devices.count == 1 ? "1 device" : "\(project.devices.count) devices"
-        let sensors = project.sensorCount == 1 ? "1 sensor" : "\(project.sensorCount) sensors"
+        let devices = MenuText.count(project.devices.count, "device")
         let header = ProjectHeaderView(
             name: project.displayName,
-            detail: "\(project.probeName) · \(devices) · \(sensors)"
+            detail: "\(project.probeName) · \(devices) · \(MenuText.count(project.sensorCount, "sensor"))"
         )
         let deviceItems = project.devices.flatMap { device in
             [NSMenuItem.sectionHeader(title: MenuText.truncated(device.heading))]
@@ -114,8 +113,7 @@ extension MenuBuilder.Context {
         if showProject, let project = devicesById[line.deviceId]?.project {
             heading.attributedTitle = sectionTitle(MenuText.truncated(line.heading), suffix: project.name)
         }
-        let text = line.pausedCount == 1 ? "1 sensor paused" : "\(line.pausedCount) sensors paused"
-        let item = action(text) { $0.open(objectId: line.deviceId) }
+        let item = action("\(MenuText.count(line.pausedCount, "sensor")) paused") { $0.open(objectId: line.deviceId) }
         item.image = MenuGlyph.paused.image
         return [heading, item]
     }

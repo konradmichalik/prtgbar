@@ -25,8 +25,8 @@ struct ProblemList {
         let items = ProblemItem.collect(from: roots, fallbackTimestamps: timestamps)
         let open = items.filter { !$0.isAcknowledged }
         return ProblemList(
-            down: sorted(open.filter { $0.status == .down || $0.status == .partialdown }, by: sort),
-            warning: sorted(open.filter { $0.status == .warning || $0.status == .unusual }, by: sort),
+            down: sorted(open.filter(\.status.isDownClass), by: sort),
+            warning: sorted(open.filter(\.status.isWarningClass), by: sort),
             acknowledged: sorted(items.filter(\.isAcknowledged), by: sort),
             paused: pausedLines(from: roots)
         )

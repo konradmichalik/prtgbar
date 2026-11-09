@@ -146,12 +146,6 @@ final class PrtgClientTests: XCTestCase {
         }
     }
 
-    func testStatusSymbolNames() {
-        for status in SensorStatus.allCases {
-            XCTAssertFalse(status.symbolName.isEmpty, "\(status) should have a symbol name")
-        }
-    }
-
     // MARK: - Write Actions
 
     private func writeURL(_ action: PrtgClient.WriteAction) throws -> URLComponents {
@@ -164,7 +158,7 @@ final class PrtgClientTests: XCTestCase {
     }
 
     func testPauseIndefinitelyURL() throws {
-        let c = try writeURL(.pause(id: 42, minutes: nil, message: nil))
+        let c = try writeURL(.pause(id: 42, minutes: nil))
         XCTAssertEqual(c.path, "/api/pause.htm")
         XCTAssertEqual(query(c, "id"), "42")
         XCTAssertEqual(query(c, "action"), "0")
@@ -172,17 +166,15 @@ final class PrtgClientTests: XCTestCase {
     }
 
     func testPauseForMinutesURL() throws {
-        let c = try writeURL(.pause(id: 42, minutes: 60, message: nil))
+        let c = try writeURL(.pause(id: 42, minutes: 60))
         XCTAssertEqual(c.path, "/api/pauseobjectfor.htm")
         XCTAssertEqual(query(c, "id"), "42")
         XCTAssertEqual(query(c, "duration"), "60")
     }
 
-    func testPauseMessageOmittedWhenNil() throws {
-        let c = try writeURL(.pause(id: 42, minutes: nil, message: nil))
-        XCTAssertNil(query(c, "pausemsg"))
-        let withMsg = try writeURL(.pause(id: 42, minutes: nil, message: "maintenance"))
-        XCTAssertEqual(query(withMsg, "pausemsg"), "maintenance")
+    func testPauseURLsCarryNoMessage() throws {
+        XCTAssertNil(query(try writeURL(.pause(id: 42, minutes: nil)), "pausemsg"))
+        XCTAssertNil(query(try writeURL(.pause(id: 42, minutes: 60)), "pausemsg"))
     }
 
     func testAcknowledgeURLOmitsMessageWhenNil() throws {

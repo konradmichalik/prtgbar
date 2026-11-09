@@ -10,7 +10,6 @@ struct ProjectDevice: Identifiable, Equatable {
     let problemSensors: [TreeNode]
     let upCount: Int
     let pausedCount: Int
-    let acknowledgedCount: Int
 
     var heading: String {
         ProjectBuilder.heading(path: path, deviceName: name)
@@ -18,7 +17,7 @@ struct ProjectDevice: Identifiable, Equatable {
 
     var quietSummary: String {
         switch (problemSensors.isEmpty, pausedCount > 0) {
-        case (true, false): upCount == 1 ? "All 1 sensor up" : "All \(upCount) sensors up"
+        case (true, false): "All \(MenuText.count(upCount, "sensor")) up"
         case (true, true): "\(upCount) up, \(pausedCount) paused"
         case (false, true): "\(upCount) more up, \(pausedCount) paused"
         case (false, false): "\(upCount) more up"
@@ -46,10 +45,12 @@ enum ProjectBuilder {
     /// Name of the group directly below a probe in the ancestor chain (root first),
     /// or the probe name when the node hangs directly under the probe.
     static func projectName(ancestors: [TreeNode]) -> String {
-        if let index = projectGroupIndex(ancestors: ancestors) {
-            return ancestors[index].name
-        }
-        return ancestors.last { $0.kind == .probedevice }?.name ?? ""
+        projectNode(ancestors: ancestors)?.name ?? ""
+    }
+
+    /// Names repeat across probes, so grouping goes by this id.
+    static func projectId(ancestors: [TreeNode]) -> Int? {
+        projectNode(ancestors: ancestors)?.id
     }
 
     /// Group names between the project group and the device, root first.
@@ -89,6 +90,13 @@ enum ProjectBuilder {
         var worstStatus: SensorStatus = .up
     }
 
+    private static func projectNode(ancestors: [TreeNode]) -> TreeNode? {
+        if let index = projectGroupIndex(ancestors: ancestors) {
+            return ancestors[index]
+        }
+        return ancestors.last { $0.kind == .probedevice }
+    }
+
     private static func projectGroupIndex(ancestors: [TreeNode]) -> Int? {
         ancestors.indices.dropFirst().first {
             ancestors[$0].kind == .group && ancestors[$0 - 1].kind == .probedevice
@@ -106,9 +114,8 @@ enum ProjectBuilder {
     }
 
     private static func add(device node: TreeNode, ancestors: [TreeNode], into buckets: inout [Bucket]) {
-        guard let probe = ancestors.last(where: { $0.kind == .probedevice }) else { return }
-        let groupIndex = projectGroupIndex(ancestors: ancestors)
-        let id = groupIndex.map { ancestors[$0].id } ?? probe.id
+        guard let probe = ancestors.last(where: { $0.kind == .probedevice }),
+              let id = projectId(ancestors: ancestors) else { return }
         let path = subgroupPath(ancestors: ancestors)
 
         let sensors = node.children.filter { $0.kind == .sensor }
@@ -122,16 +129,15 @@ enum ProjectBuilder {
             path: path,
             problemSensors: problems,
             upCount: sensors.filter { $0.status == .up }.count,
-            pausedCount: sensors.filter { $0.status == .paused }.count,
-            acknowledgedCount: sensors.filter(isAcknowledgedProblem).count
+            pausedCount: sensors.filter { $0.status == .paused }.count
         )
 
         var bucket = buckets.first { $0.id == id }
             ?? Bucket(id: id, name: projectName(ancestors: ancestors), probeName: probe.name)
         bucket.devices.append(projectDevice)
         bucket.sensorCount += sensors.count
-        bucket.downCount += problems.filter { $0.status == .down || $0.status == .partialdown }.count
-        bucket.warningCount += problems.filter { $0.status == .warning || $0.status == .unusual }.count
+        bucket.downCount += problems.filter(\.status.isDownClass).count
+        bucket.warningCount += problems.filter(\.status.isWarningClass).count
         if let worst = problems.first, worst.status.severity < bucket.worstStatus.severity {
             bucket.worstStatus = worst.status
         }
@@ -142,13 +148,8 @@ enum ProjectBuilder {
         }
     }
 
-    private static func isAcknowledgedProblem(_ sensor: TreeNode) -> Bool {
-        SensorStatus.problemStatuses.contains(sensor.status)
-            && SensorMessage(sensor.message ?? "").isAcknowledged
-    }
-
     private static func isProblem(_ sensor: TreeNode) -> Bool {
-        SensorStatus.problemStatuses.contains(sensor.status) && !isAcknowledgedProblem(sensor)
+        SensorStatus.problemStatuses.contains(sensor.status) && !sensor.isAcknowledged
     }
 
     private static func makeProject(_ bucket: Bucket) -> Project {

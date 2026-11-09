@@ -13,10 +13,11 @@ final class AlertEngineTests: XCTestCase {
 
     private func snap(
         _ id: Int, _ status: SensorStatus, device: Int = 100, deviceName: String = "web-01",
-        project: String = "Kunde A", ack: Bool = false, message: String? = nil
+        project: String = "Kunde A", projectId: Int? = 10, ack: Bool = false, message: String? = nil
     ) -> SensorSnapshot {
         SensorSnapshot(id: id, name: "Sensor \(id)", deviceId: device, deviceName: deviceName,
-                       projectName: project, status: status, isAcknowledged: ack, message: message)
+                       projectId: projectId, projectName: project, status: status, isAcknowledged: ack,
+                       message: message)
     }
 
     private func engine(_ configure: (inout AlertConfig) -> Void = { _ in }) -> AlertEngine {
@@ -72,8 +73,30 @@ final class AlertEngineTests: XCTestCase {
         _ = sut.process([snap(2, .up), snap(1, .up, device: 200, deviceName: "db-01")], at: at(0))
         let alerts = sut.process([snap(2, .down), snap(1, .down, device: 200, deviceName: "db-01")], at: at(1))
         XCTAssertEqual(alerts, [Alert(kind: .down, title: "Kunde A: 2 sensors down", body: "Sensor 1, Sensor 2",
-                                      sensorIds: [1, 2], deviceId: 200, threadId: "project-Kunde A",
+                                      sensorIds: [1, 2], deviceId: 200, threadId: "project-10",
                                       playSound: true)])
+    }
+
+    func testSameNamedProjectsDoNotMerge() {
+        var sut = engine { $0.extraChecks = 0; $0.combine = .perProject }
+        func office(_ id: Int, _ status: SensorStatus, projectId: Int) -> SensorSnapshot {
+            snap(id, status, device: id * 100, project: "Office", projectId: projectId)
+        }
+        _ = sut.process([office(1, .up, projectId: 10), office(2, .up, projectId: 20)], at: at(0))
+        let alerts = sut.process([office(1, .down, projectId: 10), office(2, .down, projectId: 20)], at: at(1))
+        XCTAssertEqual(alerts.map(\.threadId), ["project-10", "project-20"])
+        XCTAssertEqual(alerts.map(\.sensorIds), [[1], [2]])
+    }
+
+    func testSensorsWithoutProjectGroupPerDevice() {
+        var sut = engine { $0.extraChecks = 0; $0.combine = .perProject }
+        let loose = [(1, 100, "web-01"), (2, 200, "db-01")]
+        _ = sut.process(loose.map { snap($0.0, .up, device: $0.1, deviceName: $0.2, project: "", projectId: nil) },
+                        at: at(0))
+        let alerts = sut.process(
+            loose.map { snap($0.0, .down, device: $0.1, deviceName: $0.2, project: "", projectId: nil) }, at: at(1))
+        XCTAssertEqual(alerts.map(\.threadId), ["device-100", "device-200"])
+        XCTAssertEqual(alerts.map(\.title), ["web-01: Sensor 1 is down", "db-01: Sensor 2 is down"])
     }
 
     func testRecoveryOnlyAfterAlert() {
@@ -109,6 +132,21 @@ final class AlertEngineTests: XCTestCase {
         for minute in 7...12 {
             XCTAssertEqual(sut.process([snap(1, minute % 2 == 1 ? .down : .up)], at: at(Double(minute))), [])
         }
+    }
+
+    func testFlappingSilentWhenAlertsDisabled() {
+        var sut = engine {
+            $0.extraChecks = 0
+            $0.alertOnDown = false
+            $0.alertOnWarning = false
+            $0.alertOnRecovery = false
+        }
+        _ = sut.process([snap(1, .up)], at: at(0))
+        var alerts: [Alert] = []
+        for minute in 1...6 {
+            alerts += sut.process([snap(1, minute % 2 == 1 ? .down : .up)], at: at(Double(minute)))
+        }
+        XCTAssertEqual(alerts, [])
     }
 
     func testFlappingEndsAfterCalmPeriod() {
@@ -240,12 +278,26 @@ final class AlertEngineTests: XCTestCase {
 
     func testSnoozeSuppressesButKeepsState() {
         var sut = engine { $0.reminderInterval = 1800; $0.snoozedUntil = self.at(10) }
+        _ = sut.process([snap(1, .up), snap(2, .up)], at: at(0))
+        XCTAssertEqual(sut.process([snap(1, .down), snap(2, .down)], at: at(1)), [])
+        XCTAssertEqual(sut.process([snap(1, .down), snap(2, .down)], at: at(2)), [])
+        XCTAssertEqual(sut.process([snap(1, .down), snap(2, .down)], at: at(5)), [])
+        let afterSnooze = sut.process([snap(1, .down), snap(2, .down)], at: at(11))
+        XCTAssertEqual(afterSnooze.map(\.kind), [.down])
+        XCTAssertEqual(afterSnooze.first?.sensorIds, [1, 2])
+        XCTAssertEqual(sut.process([snap(1, .down), snap(2, .down)], at: at(12)), [])
+        XCTAssertEqual(sut.process([snap(1, .down), snap(2, .down)], at: at(41)).map(\.kind), [.reminder, .reminder])
+        XCTAssertEqual(sut.process([snap(1, .up), snap(2, .up)], at: at(42)).map(\.kind), [.recovery])
+    }
+
+    func testOutageWithinSnoozeSendsNoRecovery() {
+        var sut = engine { $0.extraChecks = 0; $0.snoozedUntil = self.at(10) }
         _ = sut.process([snap(1, .up)], at: at(0))
         XCTAssertEqual(sut.process([snap(1, .down)], at: at(1)), [])
         XCTAssertEqual(sut.process([snap(1, .down)], at: at(2)), [])
-        XCTAssertEqual(sut.process([snap(1, .down)], at: at(11)), [])
-        XCTAssertEqual(sut.process([snap(1, .down)], at: at(32)).map(\.kind), [.reminder])
-        XCTAssertEqual(sut.process([snap(1, .up)], at: at(33)).map(\.kind), [.recovery])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(3)), [])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(11)), [])
+        XCTAssertEqual(sut.process([snap(1, .up)], at: at(12)), [])
     }
 
     func testAcknowledgedSkipped() {

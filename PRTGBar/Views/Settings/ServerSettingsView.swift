@@ -32,10 +32,9 @@ struct ServerSettingsView: View {
             }
             Section("Polling") {
                 Picker("Poll interval", selection: $appState.refreshInterval) {
-                    Text("30 seconds").tag(30.0)
-                    Text("1 minute").tag(60.0)
-                    Text("2 minutes").tag(120.0)
-                    Text("5 minutes").tag(300.0)
+                    ForEach(SettingsMigration.allowedIntervals, id: \.self) { interval in
+                        Text(Self.intervalLabel(interval)).tag(interval)
+                    }
                 }
                 .onChange(of: appState.refreshInterval) { _, _ in appState.startPolling() }
             }
@@ -73,6 +72,10 @@ struct ServerSettingsView: View {
                     .font(.caption)
             }
         }
+    }
+
+    private static func intervalLabel(_ seconds: Double) -> String {
+        seconds < 60 ? MenuText.count(Int(seconds), "second") : MenuText.count(Int(seconds) / 60, "minute")
     }
 
     private func testConnection() {

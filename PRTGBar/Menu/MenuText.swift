@@ -20,12 +20,20 @@ enum MenuText {
         }
     }
 
+    static func summaryParts(_ s: StatusSummary) -> [(glyph: MenuGlyph, text: String)] {
+        var parts: [(glyph: MenuGlyph, text: String)] = []
+        if s.down > 0 { parts.append((.down, "\(s.down) Down")) }
+        if s.warning > 0 { parts.append((.warning, "\(s.warning) Warning")) }
+        parts.append((.up, "\(grouped(s.up)) Up"))
+        return parts
+    }
+
     static func summaryLine(_ s: StatusSummary) -> String {
-        var parts: [String] = []
-        if s.down > 0 { parts.append("\(s.down) Down") }
-        if s.warning > 0 { parts.append("\(s.warning) Warning") }
-        parts.append("\(grouped(s.up)) Up")
-        return parts.joined(separator: " · ")
+        summaryParts(s).map(\.text).joined(separator: " · ")
+    }
+
+    static func count(_ n: Int, _ noun: String) -> String {
+        "\(grouped(n)) \(noun)\(n == 1 ? "" : "s")"
     }
 
     private static func grouped(_ n: Int) -> String {

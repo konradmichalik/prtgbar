@@ -9,11 +9,9 @@ final class AppState: ObservableObject {
     // MARK: - Published State
 
     @Published var treeNodes: [TreeNode] = []
-    @Published var isLoading = false
     @Published var lastError: String?
     @Published var actionError: String?
     @Published var lastUpdated: Date?
-    @Published var isConfigured = false
     @Published private(set) var menuModel = MenuModel.make(MenuModel.Input())
 
     let history = StatusHistory(fileURL: DemoData.isEnabled ? nil : StatusHistory.defaultFileURL)
@@ -68,6 +66,7 @@ final class AppState: ObservableObject {
         if notifyOnDown || notifyOnWarning || notifyOnRecovery {
             requestNotificationPermission()
         }
+        scheduleSnoozeEnd()
         startPolling()
     }
 
@@ -75,7 +74,6 @@ final class AppState: ObservableObject {
         treeNodes = DemoData.buildTree()
         problemTimestamps = DemoData.problemTimestamps
         lastUpdated = Date()
-        isConfigured = true
         DemoData.seedHistory(history, now: Date())
         recordHistory(sensorStates(in: treeNodes))
         updateMenuModel()
@@ -84,8 +82,10 @@ final class AppState: ObservableObject {
     // MARK: - Polling
 
     private var timerCancellable: AnyCancellable?
+    /// Set while a credential edit waits for its debounce; refreshes are skipped meanwhile.
     private var credentialsRestart: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var snoozeEndTask: Task<Void, Never>?
     private var activeServerURL: String?
     /// Bumped on a server change so a fetch still running for the old server is discarded.
     private var serverGeneration = 0
@@ -96,8 +96,7 @@ final class AppState: ObservableObject {
         stopPolling()
         resetIfServerChanged()
         updateMenuModel()
-        isConfigured = !serverURL.isEmpty && !apiKey.isEmpty
-        guard isConfigured else { return }
+        guard !serverURL.isEmpty, !apiKey.isEmpty else { return }
 
         Task { await refresh() }
 
@@ -131,16 +130,18 @@ final class AppState: ObservableObject {
 
     /// Settings store every keystroke, so polling restarts once typing pauses instead of per character.
     func credentialsDidChange() {
+        stopPolling()
         credentialsRestart?.cancel()
         credentialsRestart = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
+            self?.credentialsRestart = nil
             self?.startPolling()
         }
     }
 
     func refresh() async {
-        guard !DemoData.isEnabled, !serverURL.isEmpty, !apiKey.isEmpty else { return }
+        guard !DemoData.isEnabled, credentialsRestart == nil, !serverURL.isEmpty, !apiKey.isEmpty else { return }
         // One fetch at a time, so an older response can never reach AlertEngine after a newer one.
         if let running = refreshTask { return await running.value }
         let task = Task { await fetchAndApply() }
@@ -151,7 +152,6 @@ final class AppState: ObservableObject {
 
     private func fetchAndApply() async {
         let generation = serverGeneration
-        isLoading = true
         lastError = nil
 
         do {
@@ -167,7 +167,6 @@ final class AppState: ObservableObject {
             lastError = error.localizedDescription
         }
 
-        isLoading = false
         updateMenuModel()
     }
 
@@ -215,7 +214,7 @@ final class AppState: ObservableObject {
     func pause(id: Int, minutes: Int?) async {
         await performWrite { serverURL, apiKey, acceptSelfSignedCerts in
             try await PrtgClient.pauseObject(
-                objectId: id, minutes: minutes, message: nil,
+                objectId: id, minutes: minutes,
                 serverURL: serverURL, token: apiKey, acceptSelfSignedCerts: acceptSelfSignedCerts
             )
         }
@@ -229,6 +228,11 @@ final class AppState: ObservableObject {
                 try await write(serverURL, apiKey, acceptSelfSignedCerts)
             }.value
             actionError = nil
+            // A fetch already in flight may predate the write, so wait for it and fetch again.
+            if let running = refreshTask {
+                await running.value
+                if refreshTask == running { refreshTask = nil }
+            }
             await refresh()
         } catch {
             actionError = error.localizedDescription
@@ -240,11 +244,28 @@ final class AppState: ObservableObject {
 
     func snooze(until date: Date?) {
         snoozedUntil = date?.timeIntervalSince1970 ?? 0
+        scheduleSnoozeEnd()
         updateMenuModel()
     }
 
+    /// The status item shows the snooze, so it has to update when the snooze runs out on its own.
+    private func scheduleSnoozeEnd() {
+        snoozeEndTask?.cancel()
+        snoozeEndTask = nil
+        guard let end = activeSnoozeEnd(now: Date()) else { return }
+        snoozeEndTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(end.timeIntervalSinceNow))
+            guard !Task.isCancelled else { return }
+            self?.updateMenuModel()
+        }
+    }
+
+    private func activeSnoozeEnd(now: Date) -> Date? {
+        let end = Date(timeIntervalSince1970: snoozedUntil)
+        return snoozedUntil > 0 && end > now ? end : nil
+    }
+
     func updateMenuModel(now: Date = Date()) {
-        let snoozeEnd = Date(timeIntervalSince1970: snoozedUntil)
         menuModel = MenuModel.make(MenuModel.Input(
             roots: treeNodes,
             timestamps: problemTimestamps,
@@ -254,7 +275,7 @@ final class AppState: ObservableObject {
             lastUpdated: lastUpdated,
             error: lastError,
             actionError: actionError,
-            snoozedUntil: snoozeEnd > now ? snoozeEnd : nil,
+            snoozedUntil: activeSnoozeEnd(now: now),
             showHistory: showHistory
         ))
     }
@@ -311,8 +332,7 @@ final class AppState: ObservableObject {
         config.muteFlapping = muteFlapping
         config.skipAcknowledgedAndPaused = skipAcknowledgedAndPaused
         config.reminderInterval = reminderInterval > 0 ? reminderInterval : nil
-        let snoozeEnd = Date(timeIntervalSince1970: snoozedUntil)
-        config.snoozedUntil = snoozedUntil > 0 && snoozeEnd > now ? snoozeEnd : nil
+        config.snoozedUntil = activeSnoozeEnd(now: now)
         return config
     }
 
@@ -321,7 +341,8 @@ final class AppState: ObservableObject {
         let now = Date()
         alertEngine.config = makeAlertConfig(now: now)
         let alerts = alertEngine.process(Self.snapshots(in: tree), at: now)
-        NotificationDispatcher.deliver(alerts, soundEnabled: notificationSound)
+        NotificationDispatcher.deliver(
+            alerts, soundEnabled: notificationSound, server: NotificationDispatcher.serverKey(serverURL))
     }
 
     static func snapshots(in roots: [TreeNode]) -> [SensorSnapshot] {
@@ -330,8 +351,9 @@ final class AppState: ObservableObject {
             if node.kind == .sensor, let device = ancestors.last(where: { $0.kind == .device }) {
                 result.append(SensorSnapshot(
                     id: node.id, name: node.name, deviceId: device.id, deviceName: device.name,
+                    projectId: ProjectBuilder.projectId(ancestors: ancestors),
                     projectName: ProjectBuilder.projectName(ancestors: ancestors), status: node.status,
-                    isAcknowledged: SensorMessage(node.message ?? "").isAcknowledged, message: node.message
+                    isAcknowledged: node.isAcknowledged, message: node.message
                 ))
             }
             for child in node.children { walk(child, ancestors: ancestors + [node]) }

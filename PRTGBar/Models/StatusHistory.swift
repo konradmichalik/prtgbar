@@ -70,10 +70,11 @@ final class StatusHistory {
             .appendingPathComponent("history.json")
     }
 
+    /// Paused and unknown say nothing about availability, so they leave the slot without data.
     func record(_ states: [Int: SensorStatus], at date: Date) {
         let slot = Self.slotStart(of: date)
-        for (id, status) in states {
-            slots[id, default: [:]][slot, default: SlotFlags()].add(isDown: status == .down || status == .partialdown)
+        for (id, status) in states where status != .paused && status != .unknown {
+            slots[id, default: [:]][slot, default: SlotFlags()].add(isDown: status.isDownClass)
         }
         prune(now: date)
     }

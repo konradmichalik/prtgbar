@@ -121,7 +121,6 @@ final class ProjectBuilderTests: XCTestCase {
         let project = ProjectBuilder.projects(from: roots)[0]
 
         XCTAssertEqual(project.devices[0].problemSensors, [])
-        XCTAssertEqual(project.devices[0].acknowledgedCount, 1)
         XCTAssertEqual(project.devices[0].upCount, 1)
         XCTAssertEqual(project.worstStatus, .up)
         XCTAssertEqual(project.downCount, 0)
