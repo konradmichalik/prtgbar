@@ -19,9 +19,48 @@ final class MenuBuilderTests: XCTestCase {
         let down = index(of: "DOWN", in: menu)
         let warning = index(of: "WARNING", in: menu)
         XCTAssertTrue(menu.items[down].isSectionHeader)
-        XCTAssertTrue(menu.items[down + 1].title.hasPrefix("HTTP"))
-        XCTAssertNotNil(menu.items[down + 1].submenu)
-        XCTAssertTrue(menu.items[warning + 1].title.hasPrefix("Disk"))
+        XCTAssertEqual(menu.items[down + 1].title, "Shop › web-01")
+        XCTAssertTrue(menu.items[down + 2].title.hasPrefix("HTTP"))
+        XCTAssertNotNil(menu.items[down + 2].submenu)
+        XCTAssertTrue(menu.items[warning + 2].title.hasPrefix("Disk"))
+    }
+
+    func testProblemsAreGroupedUnderDevicePathLines() throws {
+        let now = Date()
+        func sensor(_ id: Int, minutesAgo: Double) -> TreeNode {
+            TreeNode(id: id, name: "S\(id)", kind: .sensor, status: .down, lastDown: now.addingTimeInterval(-minutesAgo * 60))
+        }
+        let apiDevice = TreeNode(id: 100, name: "api", kind: .device, status: .down,
+                                 children: [sensor(1, minutesAgo: 1), sensor(3, minutesAgo: 30)])
+        let dbDevice = TreeNode(id: 200, name: "db", kind: .device, status: .down, children: [sensor(2, minutesAgo: 10)])
+        let customer = TreeNode(id: 10, name: "vhw", kind: .group, status: .down, children: [
+            TreeNode(id: 11, name: "Middleware", kind: .group, status: .down, children: [apiDevice, dbDevice]),
+        ])
+        let menu = build(MenuModel.make(MenuModel.Input(
+            roots: [customer], serverURL: "https://prtg.example.com", hasAPIKey: true, lastUpdated: now
+        )))
+
+        let down = index(of: "DOWN", in: menu)
+        let section = menu.items[(down + 1)...].prefix { !$0.isSeparatorItem && !$0.isSectionHeader }
+        let titles = section.map { $0.title.components(separatedBy: "\t")[0] }
+        XCTAssertEqual(titles, ["vhw › Middleware › api", "S1", "S3", "vhw › Middleware › db", "S2"])
+
+        let deviceLine = menu.items[down + 1]
+        XCTAssertFalse(deviceLine.isEnabled)
+        XCTAssertNil(deviceLine.submenu)
+        let sensorLine = menu.items[down + 2]
+        XCTAssertEqual(sensorLine.indentationLevel, 1)
+        XCTAssertNotNil(sensorLine.submenu)
+        XCTAssertFalse(try XCTUnwrap(sensorLine.attributedTitle?.string).contains("api"))
+    }
+
+    func testTrailingTextNeverWrapsBelowLongTitles() throws {
+        let primary = String(repeating: "W", count: 40)
+        let title = MenuBuilder.Context.rowTitle(primary, secondary: "device", trailing: "5d 2h")
+        let style = try XCTUnwrap(title.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+        let leading = NSAttributedString(string: "\(primary)  device", attributes: [.font: NSFont.menuFont(ofSize: 0)])
+
+        XCTAssertGreaterThan(try XCTUnwrap(style.tabStops.first).location, leading.size().width)
     }
 
     func testKeyEquivalents() {
@@ -35,7 +74,7 @@ final class MenuBuilderTests: XCTestCase {
 
     func testProjectSubmenuHasDeviceHeadingsAndQuietLine() throws {
         let menu = build(makeModel())
-        let shop = populated(try XCTUnwrap(item("Shop", in: menu)?.submenu))
+        let shop = populated(try XCTUnwrap(project("Shop", in: menu)?.submenu))
 
         XCTAssertNotNil(shop.items.first?.view, "project header view")
         let heading = try XCTUnwrap(shop.items.first { $0.isSectionHeader })
@@ -44,7 +83,7 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertFalse(quiet.isEnabled)
         XCTAssertNotNil(shop.items.first { $0.title == "Open Project in PRTG" })
 
-        let office = populated(try XCTUnwrap(item("Office", in: menu)?.submenu))
+        let office = populated(try XCTUnwrap(project("Office", in: menu)?.submenu))
         XCTAssertNotNil(office.items.first { $0.title == "All 1 sensor up" })
     }
 
@@ -52,7 +91,7 @@ final class MenuBuilderTests: XCTestCase {
         let actions = RecordingActions()
         let menu = MenuBuilder.build(makeModel(), history: { _ in nil }, actions: actions)
         let down = index(of: "DOWN", in: menu)
-        let detail = populated(try XCTUnwrap(menu.items[down + 1].submenu))
+        let detail = populated(try XCTUnwrap(menu.items[down + 2].submenu))
 
         XCTAssertNotNil(detail.items.first?.view, "sensor detail header view")
         let titles = detail.items.filter { !$0.isSeparatorItem && $0.view == nil }.map(\.title)
@@ -73,7 +112,7 @@ final class MenuBuilderTests: XCTestCase {
 
     func testWarningSensorDetailHasNoAcknowledge() throws {
         let menu = build(makeModel())
-        let detail = populated(try XCTUnwrap(menu.items[index(of: "WARNING", in: menu) + 1].submenu))
+        let detail = populated(try XCTUnwrap(menu.items[index(of: "WARNING", in: menu) + 2].submenu))
         let titles = detail.items.filter { !$0.isSeparatorItem && $0.view == nil }.map(\.title)
 
         XCTAssertEqual(titles, ["Pause", "Open in PRTG", "Copy Sensor Name", "Copy Sensor ID"])
@@ -88,7 +127,7 @@ final class MenuBuilderTests: XCTestCase {
                 actions: RecordingActions()
             )
             let down = index(of: "DOWN", in: menu)
-            let detail = populated(try XCTUnwrap(menu.items[down + 1].submenu))
+            let detail = populated(try XCTUnwrap(menu.items[down + 2].submenu))
             XCTAssertNotNil(detail.items.first?.view)
             XCTAssertEqual(!requested.isEmpty, expectedCalls, "showHistory \(showHistory)")
         }
@@ -98,15 +137,15 @@ final class MenuBuilderTests: XCTestCase {
         var requested: [Int] = []
         let menu = MenuBuilder.build(makeModel(), history: { requested.append($0); return nil },
                                      actions: RecordingActions())
-        let detail = try XCTUnwrap(menu.items[index(of: "DOWN", in: menu) + 1].submenu)
-        let project = try XCTUnwrap(item("Shop", in: menu)?.submenu)
+        let detail = try XCTUnwrap(menu.items[index(of: "DOWN", in: menu) + 2].submenu)
+        let projectMenu = try XCTUnwrap(project("Shop", in: menu)?.submenu)
 
         XCTAssertTrue(detail.items.isEmpty)
-        XCTAssertTrue(project.items.isEmpty)
+        XCTAssertTrue(projectMenu.items.isEmpty)
         XCTAssertTrue(requested.isEmpty)
 
         XCTAssertFalse(populated(detail).items.isEmpty)
-        XCTAssertFalse(populated(project).items.isEmpty)
+        XCTAssertFalse(populated(projectMenu).items.isEmpty)
         XCTAssertEqual(requested, [1])
     }
 
@@ -205,6 +244,11 @@ final class MenuBuilderTests: XCTestCase {
 
     private func item(_ prefix: String, in menu: NSMenu) -> NSMenuItem? {
         menu.items.first { $0.title.hasPrefix(prefix) }
+    }
+
+    /// Device lines in the problem sections start with the project name too.
+    private func project(_ name: String, in menu: NSMenu) -> NSMenuItem? {
+        menu.items[index(of: "PROJECTS", in: menu)...].first { $0.title.hasPrefix(name) }
     }
 
     private func index(of prefix: String, in menu: NSMenu) -> Int {

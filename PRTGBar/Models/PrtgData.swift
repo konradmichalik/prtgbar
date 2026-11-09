@@ -171,6 +171,8 @@ struct ProblemItem: Identifiable {
     let deviceName: String
     let deviceId: Int
     let projectName: String
+    /// Every group above the device, root first. Unlike `projectName` it does not depend on a probe.
+    let groupPath: [String]
     let isAcknowledged: Bool
     let downSince: Date?
 
@@ -217,6 +219,7 @@ struct ProblemItem: Identifiable {
                 deviceName: device?.name ?? "",
                 deviceId: device?.id ?? 0,
                 projectName: ProjectBuilder.projectName(ancestors: ancestors),
+                groupPath: ancestors.filter { $0.kind == .group }.map(\.name),
                 isAcknowledged: node.isAcknowledged,
                 downSince: node.lastDown ?? fallbackTimestamps[node.id]
             ))
