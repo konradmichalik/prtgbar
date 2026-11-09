@@ -12,7 +12,7 @@
 
 </div>
 
-PRTGBar sits in your macOS menu bar and shows all down and warning sensors from your PRTG instance at a glance — grouped by severity, with live badge counts and instant macOS notifications.
+PRTGBar sits in your macOS menu bar and shows all down and warning sensors from your PRTG instance at a glance. Problems come first, projects sit one click away, and notifications stay calm.
 
 <div align="center">
   <img src="docs/images/screenshot.jpg" alt="PRTGBar Screenshot" width="600">
@@ -25,13 +25,14 @@ PRTGBar sits in your macOS menu bar and shows all down and warning sensors from 
 
 ## ✨ Features
 
-- **Problems view** — all down and warning sensors grouped into Critical Errors and Warnings with sticky headers
-- **Alert rows** — breadcrumb path, status icon, sensor name, error message, and duration progress bar
-- **Menu bar badge** — live count of down sensors
-- **macOS notifications** — configurable alerts on sensor status changes with status-specific icons
-- **Search & filter** — find sensors by name, device, or message; hide acknowledged sensors
-- **Self-signed SSL** — works with PRTG instances behind private certificates
-- **Keychain storage** — API key stored securely in macOS Keychain
+- **Native menu** with problems first, then your projects (the top-level groups below each probe) with their devices and sensors
+- **Sensor details** with a 24 h history strip, uptime ratio and outage count, kept locally
+- **Menu bar badge** with the live count of down sensors, optionally a warning indicator
+- **Calm notifications** grouped per device or group, with a wait before alerting, flapping mute, reminders and recovery messages
+- **Acknowledge and Open in PRTG** straight from a down notification, and acknowledge or pause sensors from the menu
+- **Snooze** notifications for one hour or until 08:00
+- **Self-signed SSL** works with PRTG instances behind private certificates
+- **Keychain storage** keeps the API key in the macOS Keychain
 
 ---
 
@@ -63,7 +64,7 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## ⚙️ Setup
 
-Open the settings panel via the gear icon in the PRTGBar toolbar and configure your connection:
+Open **Settings…** from the PRTGBar menu (or press `⌘,`) and configure your connection in the **Server** tab:
 
 | Setting | Description |
 |---------|-------------|
@@ -72,13 +73,13 @@ Open the settings panel via the gear icon in the PRTGBar toolbar and configure y
 | **Accept self-signed certificates** | Allow connections to PRTG instances with self-signed SSL certificates. Enabled by default. |
 
 > [!WARNING]
-> The API key requires sufficient PRTG permissions to read sensors, devices, groups, and probes. A read-only account with global visibility is recommended.
+> The API key needs permission to read sensors, devices, groups, and probes. A read-only key is enough for monitoring. Acknowledging and pausing sensors from the menu or a notification needs a key with write access.
 
 ### Generating a PRTG API Token
 
 1. Log in to your PRTG instance.
 2. Go to **Setup > My Account > API Keys**.
-3. Create a new key with **Read** access.
+3. Create a new key with **Read** access, or **Read/Write** to acknowledge and pause sensors.
 4. Paste the token into PRTGBar's **API Key** field.
 
 Once saved, PRTGBar polls immediately — no restart required.

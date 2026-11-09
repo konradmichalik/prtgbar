@@ -6,6 +6,8 @@ enum PrtgClientError: LocalizedError {
     case serverError(Int)
     case networkError(Error)
     case decodingError(Error)
+    case readOnly
+    case partiallyAcknowledged(failed: Int, total: Int)
 
     var errorDescription: String? {
         switch self {
@@ -14,6 +16,8 @@ enum PrtgClientError: LocalizedError {
         case .serverError(let code): "Server returned error \(code)"
         case .networkError(let error): "Network error: \(error.localizedDescription)"
         case .decodingError(let error): "Failed to parse response: \(error.localizedDescription)"
+        case .readOnly: "This API key is read-only or lacks permission for this action."
+        case .partiallyAcknowledged(let failed, let total): "\(failed) of \(total) sensors could not be acknowledged."
         }
     }
 }
@@ -189,25 +193,6 @@ enum PrtgClient {
         return true
     }
 
-    // MARK: - Acknowledge Alarm
-
-    static func acknowledgeAlarm(
-        objectId: Int, message: String = "Acknowledged via PRTGBar",
-        serverURL: String, token: String, acceptSelfSignedCerts: Bool = true
-    ) async throws {
-        let url = try buildURL(
-            serverURL: serverURL,
-            path: "/api/acknowledgealarm.htm",
-            token: token,
-            queryItems: [
-                URLQueryItem(name: "id", value: "\(objectId)"),
-                URLQueryItem(name: "ackmsg", value: message),
-            ]
-        )
-
-        _ = try await performRequest(url: url, token: token, acceptSelfSignedCerts: acceptSelfSignedCerts)
-    }
-
     // MARK: - V1 Table Fetch
 
     private static func fetchTable(
@@ -311,7 +296,7 @@ enum PrtgClient {
 
     // MARK: - URL Building
 
-    private static func buildURL(
+    static func buildURL(
         serverURL: String,
         path: String,
         token: String,
@@ -344,7 +329,7 @@ enum PrtgClient {
 
     // MARK: - Request
 
-    private static func performRequest(url: URL, token: String, acceptSelfSignedCerts: Bool = true) async throws -> Data {
+    static func performRequest(url: URL, token: String, acceptSelfSignedCerts: Bool = true) async throws -> Data {
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 

@@ -55,68 +55,9 @@ final class TreeBuildingTests: XCTestCase {
         XCTAssertEqual(device.children.count, 2, "Device should have two sensors")
     }
 
-    func testWorstStatusPropagation() {
-        let objects = [
-            PrtgObject(
-                id: 1, name: "Probe", kind: .probedevice,
-                status: .up, message: nil, parent: nil,
-                tags: nil, active: true, sensorStatusSummary: nil, lastDown: nil
-            ),
-            PrtgObject(
-                id: 10, name: "Device", kind: .device,
-                status: .up, message: nil,
-                parent: ParentRef(id: 1, type: "probedevice", name: "Probe"),
-                tags: nil, active: true, sensorStatusSummary: nil, lastDown: nil
-            ),
-            PrtgObject(
-                id: 100, name: "Ping", kind: .sensor,
-                status: .up, message: nil,
-                parent: ParentRef(id: 10, type: "device", name: "Device"),
-                tags: nil, active: true, sensorStatusSummary: nil, lastDown: nil
-            ),
-            PrtgObject(
-                id: 101, name: "HTTP", kind: .sensor,
-                status: .down, message: nil,
-                parent: ParentRef(id: 10, type: "device", name: "Device"),
-                tags: nil, active: true, sensorStatusSummary: nil, lastDown: nil
-            ),
-        ]
-
-        let tree = TreeBuilder.buildTree(from: objects)
-
-        XCTAssertEqual(tree[0].worstStatus, .down, "Probe should reflect worst child status")
-        XCTAssertEqual(tree[0].children[0].worstStatus, .down, "Device should reflect worst sensor status")
-        XCTAssertTrue(tree[0].hasDownSensors)
-    }
-
     func testEmptyList() {
         let tree = TreeBuilder.buildTree(from: [])
         XCTAssertTrue(tree.isEmpty)
-    }
-
-    func testTotalSensorCount() {
-        let objects = [
-            PrtgObject(
-                id: 1, name: "Probe", kind: .probedevice,
-                status: .up, message: nil, parent: nil,
-                tags: nil, active: true, sensorStatusSummary: nil, lastDown: nil
-            ),
-            PrtgObject(
-                id: 10, name: "Sensor A", kind: .sensor,
-                status: .up, message: nil,
-                parent: ParentRef(id: 1, type: "probedevice", name: "Probe"),
-                tags: nil, active: true, sensorStatusSummary: nil, lastDown: nil
-            ),
-            PrtgObject(
-                id: 11, name: "Sensor B", kind: .sensor,
-                status: .up, message: nil,
-                parent: ParentRef(id: 1, type: "probedevice", name: "Probe"),
-                tags: nil, active: true, sensorStatusSummary: nil, lastDown: nil
-            ),
-        ]
-
-        let tree = TreeBuilder.buildTree(from: objects)
-        XCTAssertEqual(tree[0].totalSensorCount, 2)
     }
 
     func testSortingByKindAndName() {

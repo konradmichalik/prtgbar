@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 // MARK: - Sensor Message Parsing
 
@@ -35,31 +35,10 @@ enum SensorStatus: String, Codable, CaseIterable {
     case partialdown
     case unknown
 
-    var symbolName: String {
-        switch self {
-        case .up: "checkmark.circle.fill"
-        case .down: "xmark.circle.fill"
-        case .warning: "exclamationmark.triangle.fill"
-        case .paused: "pause.circle.fill"
-        case .unusual: "exclamationmark.circle.fill"
-        case .partialdown: "exclamationmark.circle.fill"
-        case .unknown: "questionmark.circle.fill"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .up: .green
-        case .down: .red
-        case .warning: .orange
-        case .paused: .secondary
-        case .unusual: .orange
-        case .partialdown: .orange
-        case .unknown: .secondary
-        }
-    }
-
     static let problemStatuses: Set<SensorStatus> = [.down, .partialdown, .warning, .unusual]
+
+    var isDownClass: Bool { self == .down || self == .partialdown }
+    var isWarningClass: Bool { self == .warning || self == .unusual }
 
     var notificationLabel: String {
         switch self {
@@ -94,22 +73,6 @@ struct StatusSummary: Codable, Equatable {
     let unknown: Int
 
     var total: Int { up + down + warning + paused + unknown }
-
-    static let empty = StatusSummary(up: 0, down: 0, warning: 0, paused: 0, unknown: 0)
-
-    static func + (lhs: StatusSummary, rhs: StatusSummary) -> StatusSummary {
-        StatusSummary(
-            up: lhs.up + rhs.up,
-            down: lhs.down + rhs.down,
-            warning: lhs.warning + rhs.warning,
-            paused: lhs.paused + rhs.paused,
-            unknown: lhs.unknown + rhs.unknown
-        )
-    }
-
-    static func += (lhs: inout StatusSummary, rhs: StatusSummary) {
-        lhs = lhs + rhs
-    }
 }
 
 // MARK: - PRTG Object (API Response)
@@ -170,29 +133,10 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
     let kind: ObjectKind
     let status: SensorStatus
     let message: String?
-    let statusSummary: StatusSummary?
     let lastDown: Date?
     var children: [TreeNode]
 
-    var hasDownSensors: Bool {
-        if status == .down { return true }
-        if let summary = statusSummary, summary.down > 0 { return true }
-        return children.contains { $0.hasDownSensors }
-    }
-
-    var worstStatus: SensorStatus {
-        let childWorst = children.map(\.worstStatus).min(by: { $0.severity < $1.severity })
-        if let childWorst, childWorst.severity < status.severity {
-            return childWorst
-        }
-        return status
-    }
-
-    var totalSensorCount: Int {
-        if kind == .sensor { return 1 }
-        if let summary = statusSummary { return summary.total }
-        return children.reduce(0) { $0 + $1.totalSensorCount }
-    }
+    var isAcknowledged: Bool { SensorMessage(message ?? "").isAcknowledged }
 
     init(
         id: Int,
@@ -200,7 +144,6 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
         kind: ObjectKind,
         status: SensorStatus,
         message: String? = nil,
-        statusSummary: StatusSummary? = nil,
         lastDown: Date? = nil,
         children: [TreeNode] = []
     ) {
@@ -209,7 +152,6 @@ final class TreeNode: Identifiable, Equatable, @unchecked Sendable {
         self.kind = kind
         self.status = status
         self.message = message
-        self.statusSummary = statusSummary
         self.lastDown = lastDown
         self.children = children
     }
@@ -227,14 +169,16 @@ struct ProblemItem: Identifiable {
     let status: SensorStatus
     let message: String?
     let deviceName: String
-    let groupName: String?
+    let deviceId: Int
+    let projectName: String
+    let isAcknowledged: Bool
     let downSince: Date?
 
     var breadcrumb: String {
-        if let groupName, !deviceName.isEmpty {
-            return "\(groupName) › \(deviceName)"
+        if !projectName.isEmpty, !deviceName.isEmpty {
+            return "\(projectName) › \(deviceName)"
         }
-        return deviceName.isEmpty ? (groupName ?? "") : deviceName
+        return deviceName.isEmpty ? projectName : deviceName
     }
 
     static func collect(from nodes: [TreeNode], fallbackTimestamps: [Int: Date] = [:]) -> [ProblemItem] {
@@ -265,14 +209,15 @@ struct ProblemItem: Identifiable {
     ) {
         if node.kind == .sensor, node.status != .up, node.status != .paused {
             let device = ancestors.last { $0.kind == .device }
-            let group = ancestors.last { $0.kind == .group }
             items.append(ProblemItem(
                 id: node.id,
                 sensorName: node.name,
                 status: node.status,
                 message: node.message,
                 deviceName: device?.name ?? "",
-                groupName: group?.name,
+                deviceId: device?.id ?? 0,
+                projectName: ProjectBuilder.projectName(ancestors: ancestors),
+                isAcknowledged: node.isAcknowledged,
                 downSince: node.lastDown ?? fallbackTimestamps[node.id]
             ))
         }
@@ -293,7 +238,6 @@ enum TreeBuilder {
                 kind: obj.kind,
                 status: obj.status ?? .unknown,
                 message: obj.message,
-                statusSummary: obj.sensorStatusSummary,
                 lastDown: obj.lastDown
             )
         }

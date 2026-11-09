@@ -5,15 +5,19 @@ enum DemoData {
         CommandLine.arguments.contains("--demo")
     }
 
+    static let serverURL = "https://prtg.example.com"
+
     // MARK: - Demo Tree
 
     static func buildTree() -> [TreeNode] {
-        let probe = TreeNode(id: 1, name: "Local Probe", kind: .probedevice, status: .up, children: [
-            groupWebservers,
-            groupNetwork,
-            groupCloud,
-        ])
-        return [probe]
+        [
+            TreeNode(id: 1, name: "Local Probe", kind: .probedevice, status: .down, children: [
+                groupWebServers, groupDatabases, groupNetwork, groupOffice,
+            ]),
+            TreeNode(id: 2, name: "Frankfurt Probe", kind: .probedevice, status: .warning, children: [
+                groupWebServersFrankfurt, groupOfficeFrankfurt,
+            ]),
+        ]
     }
 
     static var problemTimestamps: [Int: Date] {
@@ -22,28 +26,88 @@ enum DemoData {
             102: Date(timeIntervalSinceNow: -45),        // < 1m
             201: Date(timeIntervalSinceNow: -3_720),     // ~1h
             301: Date(timeIntervalSinceNow: -172_800),   // 2d
+            501: Date(timeIntervalSinceNow: -7_200),     // 2h
         ]
+    }
+
+    private struct Outage {
+        let id: Int
+        let hoursAgo: Double
+        let minutes: Double
+    }
+
+    /// Sensor 101 was down for 90 minutes about 5 h ago, sensor 201 for 30 minutes about 2 h ago.
+    @MainActor static func seedHistory(_ history: StatusHistory, now: Date) {
+        let outages = [Outage(id: 101, hoursAgo: 5, minutes: 90), Outage(id: 201, hoursAgo: 2, minutes: 30)]
+        for outage in outages {
+            let downStart = now.addingTimeInterval(-outage.hoursAgo * 3600)
+            let downEnd = downStart.addingTimeInterval(outage.minutes * 60)
+            for minutesAgo in stride(from: 480, through: 10, by: -10) {
+                let date = now.addingTimeInterval(-Double(minutesAgo) * 60)
+                let isDown = date >= downStart && date < downEnd
+                history.record([outage.id: isDown ? .down : .up], at: date)
+            }
+        }
     }
 
     // MARK: - Groups
 
-    private static var groupWebservers: TreeNode {
-        TreeNode(id: 10, name: "Webservers", kind: .group, status: .down, children: [
+    private static var groupWebServers: TreeNode {
+        TreeNode(id: 10, name: "Web Servers", kind: .group, status: .down, children: [
             deviceStage,
+            TreeNode(id: 11, name: "Shop", kind: .group, status: .up, children: [deviceShop]),
             deviceProduction,
         ])
     }
 
+    private static var groupWebServersFrankfurt: TreeNode {
+        TreeNode(id: 60, name: "Web Servers", kind: .group, status: .warning, children: [
+            TreeNode(id: 600, name: "Webserver - Edge", kind: .device, status: .warning, children: [
+                TreeNode(
+                    id: 601, name: "HTTP Latency", kind: .sensor, status: .warning,
+                    message: "Response time 2400 ms", lastDown: Date(timeIntervalSinceNow: -900)
+                ),
+                TreeNode(id: 602, name: "Ping", kind: .sensor, status: .up),
+            ]),
+        ])
+    }
+
+    private static var groupDatabases: TreeNode {
+        TreeNode(id: 20, name: "Databases", kind: .group, status: .down, children: [
+            TreeNode(id: 400, name: "MySQL Primary", kind: .device, status: .down, children: [
+                TreeNode(
+                    id: 401, name: "MySQL Connections", kind: .sensor, status: .down,
+                    message: "Acknowledged by admin [K.Michalik]: Maintenance window until 2026-03-12",
+                    lastDown: Date(timeIntervalSinceNow: -172_800)
+                ),
+                TreeNode(id: 402, name: "Disk Free", kind: .sensor, status: .up),
+            ]),
+            deviceAWS,
+        ])
+    }
+
     private static var groupNetwork: TreeNode {
-        TreeNode(id: 20, name: "Network Infrastructure", kind: .group, status: .warning, children: [
+        TreeNode(id: 30, name: "Network", kind: .group, status: .warning, children: [
             deviceFirewall,
             deviceSwitch,
         ])
     }
 
-    private static var groupCloud: TreeNode {
-        TreeNode(id: 30, name: "Cloud Services", kind: .group, status: .down, children: [
-            deviceAWS,
+    private static var groupOffice: TreeNode {
+        TreeNode(id: 40, name: "Office", kind: .group, status: .up, children: [
+            TreeNode(id: 700, name: "Office Router", kind: .device, status: .up, children: [
+                TreeNode(id: 701, name: "Ping", kind: .sensor, status: .up),
+                TreeNode(id: 702, name: "Bandwidth", kind: .sensor, status: .up),
+            ]),
+        ])
+    }
+
+    private static var groupOfficeFrankfurt: TreeNode {
+        TreeNode(id: 70, name: "Office", kind: .group, status: .up, children: [
+            TreeNode(id: 800, name: "Frankfurt Switch", kind: .device, status: .up, children: [
+                TreeNode(id: 801, name: "Ping", kind: .sensor, status: .up),
+                TreeNode(id: 802, name: "Port Utilization", kind: .sensor, status: .paused),
+            ]),
         ])
     }
 
@@ -58,6 +122,17 @@ enum DemoData {
             ),
             TreeNode(id: 102, name: "Ping", kind: .sensor, status: .up),
             TreeNode(id: 103, name: "CPU Load", kind: .sensor, status: .up),
+        ])
+    }
+
+    private static var deviceShop: TreeNode {
+        TreeNode(id: 120, name: "Shop Frontend", kind: .device, status: .down, children: [
+            TreeNode(
+                id: 501, name: "Checkout Health", kind: .sensor, status: .down,
+                message: "HTTP/1.1 503 Service Unavailable",
+                lastDown: Date(timeIntervalSinceNow: -7_200)
+            ),
+            TreeNode(id: 502, name: "HTTP", kind: .sensor, status: .up),
         ])
     }
 
