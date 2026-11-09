@@ -44,6 +44,8 @@ final class StatusItemController: NSObject, NSMenuDelegate, MenuActions {
     // MARK: - MenuActions
 
     func openPRTG() {
+        // The server link in the header is a view, so the menu does not close on its own.
+        statusItem.menu?.cancelTracking()
         appState.open(path: "/", objectId: nil)
     }
 
@@ -171,8 +173,7 @@ private enum StatusIcon {
     private static func style(for level: GaugeLevel) -> GaugeIcon.Style {
         switch level {
         case .ok: .template
-        case .warning: .tinted(.systemOrange)
-        case .down: .tinted(.systemRed)
+        case .warning, .down: .accented
         }
     }
 

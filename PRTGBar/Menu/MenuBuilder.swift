@@ -189,14 +189,19 @@ extension MenuBuilder.Context {
         guard model.isConfigured else {
             return [action("Set up PRTG…") { $0.openSettings() }, .separator()] + appItems()
         }
+        let target = actions
         let summary = SummaryHeaderView(
-            host: model.serverHost, summary: model.summary, hasData: model.lastUpdated != nil, activity: activity
+            host: model.serverHost, summary: model.summary, hasData: model.lastUpdated != nil, activity: activity,
+            openServer: { [weak target] in target?.openPRTG() }
         )
         var items: [NSMenuItem] = errorItems()
-        items.append(headerItem(summary))
+        items.append(headerItem(summary, stretches: true))
         items.append(NSMenuItem.separator())
-        items.append(contentsOf: problemItems())
-        items.append(contentsOf: acknowledgedItems())
+        let problems = problemItems()
+        let acknowledged = acknowledgedItems()
+        items.append(contentsOf: problems)
+        if !problems.isEmpty, !acknowledged.isEmpty { items.append(NSMenuItem.separator()) }
+        items.append(contentsOf: acknowledged)
         items.append(contentsOf: projectSection())
         items.append(NSMenuItem.separator())
         items.append(contentsOf: prtgItems())
@@ -206,8 +211,10 @@ extension MenuBuilder.Context {
         return items
     }
 
-    func headerItem<V: View>(_ view: V) -> NSMenuItem {
+    /// A stretching view follows the menu width, so content can sit at the right edge.
+    func headerItem<V: View>(_ view: V, stretches: Bool = false) -> NSMenuItem {
         let hosting = NSHostingView(rootView: view)
+        if stretches { hosting.autoresizingMask = [.width] }
         hosting.frame = NSRect(origin: .zero, size: hosting.fittingSize)
         let item = NSMenuItem()
         item.view = hosting

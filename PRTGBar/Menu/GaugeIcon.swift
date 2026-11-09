@@ -19,8 +19,8 @@ enum GaugeIcon {
     enum Style {
         /// Monochrome menu bar template.
         case template
-        /// One colour for the whole scale, needle in the label colour.
-        case tinted(NSColor)
+        /// Label colour, with only the segment of the current level in its status colour.
+        case accented
         /// The app icon colours on a white tile.
         case logo
     }
@@ -79,7 +79,7 @@ enum GaugeIcon {
         let center = NSPoint(x: rect.midX, y: rect.minY + rect.height * 0.42)
         let lineWidth = rect.width * 0.15
         let radius = rect.width / 2 - lineWidth / 2
-        for segment in segments(for: style) {
+        for segment in segments(for: style, level: level) {
             let arc = NSBezierPath()
             arc.appendArc(withCenter: center, radius: radius, startAngle: segment.from, endAngle: segment.to, clockwise: true)
             arc.lineWidth = lineWidth
@@ -90,22 +90,34 @@ enum GaugeIcon {
         needle(center: center, length: radius * 0.72, width: lineWidth * 0.55, angle: needleAngle(for: level)).fill()
     }
 
-    private static func segments(for style: Style) -> [Segment] {
+    private static func segments(for style: Style, level: GaugeLevel) -> [Segment] {
         switch style {
-        case .template: [Segment(from: scaleStart, to: scaleEnd, color: .black)]
-        case .tinted(let color): [Segment(from: scaleStart, to: scaleEnd, color: color)]
-        case .logo: [
-            Segment(from: scaleStart, to: 148, color: green),
-            Segment(from: 144, to: 40, color: orange),
-            Segment(from: 36, to: scaleEnd, color: pink),
-        ]
+        case .template:
+            return scale(.black, .black, .black)
+        case .logo:
+            return scale(green, orange, pink)
+        case .accented:
+            return scale(
+                .labelColor,
+                level == .warning ? .systemOrange : .labelColor,
+                level == .down ? .systemRed : .labelColor
+            )
         }
+    }
+
+    /// Same three segments in every style, so the icon keeps its shape when the state changes.
+    private static func scale(_ ok: NSColor, _ warning: NSColor, _ down: NSColor) -> [Segment] {
+        [
+            Segment(from: scaleStart, to: 148, color: ok),
+            Segment(from: 144, to: 40, color: warning),
+            Segment(from: 36, to: scaleEnd, color: down),
+        ]
     }
 
     private static func needleColor(for style: Style) -> NSColor {
         switch style {
         case .template: .black
-        case .tinted: .labelColor
+        case .accented: .labelColor
         case .logo: navy
         }
     }

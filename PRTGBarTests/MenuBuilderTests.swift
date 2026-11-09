@@ -94,6 +94,12 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertFalse(shop.string.contains("▲") || shop.string.contains("✕"))
     }
 
+    func testAcknowledgedIsSeparatedFromProblems() {
+        let menu = build(makeModel())
+        let acknowledged = index(of: "Acknowledged & Paused", in: menu)
+        XCTAssertTrue(menu.items[acknowledged - 1].isSeparatorItem)
+    }
+
     func testKeyEquivalents() {
         let menu = build(makeModel())
 

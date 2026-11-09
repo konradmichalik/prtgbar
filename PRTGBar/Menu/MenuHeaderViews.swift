@@ -13,6 +13,7 @@ struct SummaryHeaderView: View {
     let summary: StatusSummary
     let hasData: Bool
     @ObservedObject var activity: RefreshActivity
+    let openServer: @MainActor () -> Void
 
     private var isAllUp: Bool { hasData && summary.down == 0 && summary.warning == 0 }
 
@@ -28,20 +29,27 @@ struct SummaryHeaderView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     (Text("PRTG").font(.headline) + Text("bar").font(.caption).baselineOffset(6))
-                    Text(host).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    Button(action: openServer) {
+                        Text(host).lineLimit(1).truncationMode(.middle)
+                    }
+                    .buttonStyle(.link)
+                    .help("Open PRTG")
                 }
-                summaryLine.font(.callout)
-            }
-            Spacer(minLength: 0)
-            if activity.isRefreshing {
-                ProgressView()
-                    .controlSize(.small)
-                    .accessibilityLabel("Refreshing")
+                HStack(spacing: 6) {
+                    summaryLine.font(.callout)
+                    Spacer(minLength: 0)
+                    if activity.isRefreshing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel("Refreshing")
+                    }
+                }
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-        .frame(width: MenuLayout.headerWidth, alignment: .leading)
+        .frame(minWidth: MenuLayout.headerWidth, maxWidth: .infinity, alignment: .leading)
     }
 
     private var summaryLine: Text {
