@@ -33,7 +33,8 @@ struct SummaryHeaderView: View {
                     Button(action: openServer) {
                         Text(host).lineLimit(1).truncationMode(.middle)
                     }
-                    .buttonStyle(.link)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     .help("Open PRTG")
                 }
                 HStack(spacing: 6) {
