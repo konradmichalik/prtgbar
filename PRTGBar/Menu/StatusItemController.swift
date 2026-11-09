@@ -115,7 +115,8 @@ final class StatusItemController: NSObject, NSMenuDelegate, MenuActions {
         let built = MenuBuilder.build(
             appState.menuModel,
             history: { history.summary(for: $0, now: Date()) },
-            actions: self
+            actions: self,
+            activity: appState.activity
         )
         let items = built.items
         built.removeAllItems()

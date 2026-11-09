@@ -1,6 +1,12 @@
-import Foundation
+import AppKit
 
 enum MenuText {
+    static func muted(_ text: String) -> NSAttributedString {
+        NSAttributedString(string: text, attributes: [
+            .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.secondaryLabelColor,
+        ])
+    }
+
     /// Keeps head and tail so hostnames stay recognisable; the head gets the extra character when odd.
     static func truncated(_ s: String, max: Int = 48) -> String {
         guard s.count > max, max > 1 else { return s }

@@ -159,3 +159,22 @@ struct AlertEngine: Sendable {
         }
     }
 }
+
+extension SensorSnapshot {
+    static func collect(in roots: [TreeNode], projectLevel: Int = 1) -> [SensorSnapshot] {
+        var result: [SensorSnapshot] = []
+        func walk(_ node: TreeNode, ancestors: [TreeNode]) {
+            if node.kind == .sensor, let device = ancestors.last(where: { $0.kind == .device }) {
+                result.append(SensorSnapshot(
+                    id: node.id, name: node.name, deviceId: device.id, deviceName: device.name,
+                    projectId: ProjectBuilder.projectId(ancestors: ancestors, level: projectLevel),
+                    projectName: ProjectBuilder.projectName(ancestors: ancestors, level: projectLevel), status: node.status,
+                    isAcknowledged: node.isAcknowledged, message: node.message
+                ))
+            }
+            for child in node.children { walk(child, ancestors: ancestors + [node]) }
+        }
+        roots.forEach { walk($0, ancestors: []) }
+        return result
+    }
+}

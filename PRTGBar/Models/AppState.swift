@@ -3,6 +3,12 @@ import Combine
 import UserNotifications
 import os
 
+/// Separate from AppState, so an open menu can show the spinner without being rebuilt.
+@MainActor
+final class RefreshActivity: ObservableObject {
+    @Published fileprivate(set) var isRefreshing = false
+}
+
 @MainActor
 final class AppState: ObservableObject {
 
@@ -14,6 +20,7 @@ final class AppState: ObservableObject {
     @Published var lastUpdated: Date?
     @Published private(set) var menuModel = MenuModel.make(MenuModel.Input())
 
+    let activity = RefreshActivity()
     let history = StatusHistory(fileURL: DemoData.isEnabled ? nil : StatusHistory.defaultFileURL)
 
     // MARK: - Settings (persisted)
@@ -120,6 +127,7 @@ final class AppState: ObservableObject {
         guard let activeServerURL, activeServerURL != serverURL else { return }
         serverGeneration += 1
         refreshTask = nil
+        activity.isRefreshing = false
         alertEngine = AlertEngine()
         problemTimestamps = [:]
         history.removeAll()
@@ -147,8 +155,12 @@ final class AppState: ObservableObject {
         if let running = refreshTask { return await running.value }
         let task = Task { await fetchAndApply() }
         refreshTask = task
+        activity.isRefreshing = true
         await task.value
-        if refreshTask == task { refreshTask = nil }
+        if refreshTask == task {
+            refreshTask = nil
+            activity.isRefreshing = false
+        }
     }
 
     private func fetchAndApply() async {
@@ -342,25 +354,8 @@ final class AppState: ObservableObject {
         guard !DemoData.isEnabled else { return }
         let now = Date()
         alertEngine.config = makeAlertConfig(now: now)
-        let alerts = alertEngine.process(Self.snapshots(in: tree, projectLevel: projectLevel), at: now)
+        let alerts = alertEngine.process(SensorSnapshot.collect(in: tree, projectLevel: projectLevel), at: now)
         NotificationDispatcher.deliver(
             alerts, soundEnabled: notificationSound, server: NotificationDispatcher.serverKey(serverURL))
-    }
-
-    static func snapshots(in roots: [TreeNode], projectLevel: Int = 1) -> [SensorSnapshot] {
-        var result: [SensorSnapshot] = []
-        func walk(_ node: TreeNode, ancestors: [TreeNode]) {
-            if node.kind == .sensor, let device = ancestors.last(where: { $0.kind == .device }) {
-                result.append(SensorSnapshot(
-                    id: node.id, name: node.name, deviceId: device.id, deviceName: device.name,
-                    projectId: ProjectBuilder.projectId(ancestors: ancestors, level: projectLevel),
-                    projectName: ProjectBuilder.projectName(ancestors: ancestors, level: projectLevel), status: node.status,
-                    isAcknowledged: node.isAcknowledged, message: node.message
-                ))
-            }
-            for child in node.children { walk(child, ancestors: ancestors + [node]) }
-        }
-        roots.forEach { walk($0, ancestors: []) }
-        return result
     }
 }

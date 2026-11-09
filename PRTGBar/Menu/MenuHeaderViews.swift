@@ -12,6 +12,7 @@ struct SummaryHeaderView: View {
     let host: String
     let summary: StatusSummary
     let hasData: Bool
+    @ObservedObject var activity: RefreshActivity
 
     private var isAllUp: Bool { hasData && summary.down == 0 && summary.warning == 0 }
 
@@ -26,10 +27,16 @@ struct SummaryHeaderView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text("PRTG").font(.headline)
+                    (Text("PRTG").font(.headline) + Text("bar").font(.caption).baselineOffset(6))
                     Text(host).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
                 summaryLine.font(.callout)
+            }
+            Spacer(minLength: 0)
+            if activity.isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Refreshing")
             }
         }
         .padding(.horizontal, 14)
@@ -38,7 +45,7 @@ struct SummaryHeaderView: View {
     }
 
     private var summaryLine: Text {
-        guard hasData else { return Text("Waiting for data…").foregroundColor(.secondary) }
+        guard hasData else { return Text("Loading…").foregroundColor(.secondary) }
         if isAllUp {
             return glyphPart(.up, "All \(MenuText.count(summary.up, "sensor")) up")
         }
@@ -55,12 +62,14 @@ struct SummaryHeaderView: View {
 
 // MARK: - Device Line
 
-struct DeviceLineView: View {
-    let path: String
+struct PathLineView: View {
+    let text: String
+    let emphasized: Bool
 
     var body: some View {
-        Text(path)
-            .foregroundStyle(.secondary)
+        Text(text)
+            .fontWeight(emphasized ? .semibold : .regular)
+            .foregroundStyle(emphasized ? .primary : .secondary)
             .lineLimit(1)
             .truncationMode(.middle)
             .padding(.horizontal, 14)

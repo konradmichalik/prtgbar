@@ -115,9 +115,10 @@ enum MenuBuilder {
         _ model: MenuModel,
         history: @escaping (Int) -> HistorySummary?,
         actions: MenuActions,
+        activity: RefreshActivity = RefreshActivity(),
         now: Date = Date()
     ) -> NSMenu {
-        let context = Context(model: model, history: history, actions: actions, now: now)
+        let context = Context(model: model, history: history, actions: actions, activity: activity, now: now)
         return makeMenu(context.mainItems())
     }
 
@@ -150,9 +151,14 @@ enum MenuBuilder {
         let devicesById: [Int: (project: Project, device: ProjectDevice)]
         /// One right-aligned column for durations and counts, so they line up across rows.
         let trailingColumn: CGFloat
+        let activity: RefreshActivity
 
-        init(model: MenuModel, history: @escaping (Int) -> HistorySummary?, actions: MenuActions, now: Date) {
+        init(
+            model: MenuModel, history: @escaping (Int) -> HistorySummary?, actions: MenuActions,
+            activity: RefreshActivity, now: Date
+        ) {
             self.model = model
+            self.activity = activity
             self.history = history
             self.actions = actions
             self.now = now
@@ -183,7 +189,9 @@ extension MenuBuilder.Context {
         guard model.isConfigured else {
             return [action("Set up PRTG…") { $0.openSettings() }, .separator()] + appItems()
         }
-        let summary = SummaryHeaderView(host: model.serverHost, summary: model.summary, hasData: model.lastUpdated != nil)
+        let summary = SummaryHeaderView(
+            host: model.serverHost, summary: model.summary, hasData: model.lastUpdated != nil, activity: activity
+        )
         var items: [NSMenuItem] = errorItems()
         items.append(headerItem(summary))
         items.append(NSMenuItem.separator())
@@ -211,7 +219,7 @@ extension MenuBuilder.Context {
         item.attributedTitle = Self.rowTitle(
             MenuText.truncated(row.name, max: 40),
             secondary: showDevice && !row.deviceName.isEmpty ? MenuText.truncated(row.deviceName, max: 24) : nil,
-            trailing: row.since.map { formatDuration(now.timeIntervalSince($0)) } ?? row.lastValue,
+            trailing: (row.since.map { formatDuration(now.timeIntervalSince($0)) } ?? row.lastValue).map(MenuText.muted),
             column: trailingColumn
         )
         item.image = (row.isAcknowledged ? MenuGlyph.acknowledged : MenuGlyph(status: row.status)).image
@@ -241,7 +249,7 @@ extension MenuBuilder.Context {
     }
 
     static func rowTitle(
-        _ primary: String, secondary: String? = nil, trailing: String? = nil,
+        _ primary: String, secondary: String? = nil, trailing: NSAttributedString? = nil,
         column: CGFloat = MenuLayout.headerWidth - 50
     ) -> NSAttributedString {
         let font = NSFont.menuFont(ofSize: 0)
@@ -252,8 +260,9 @@ extension MenuBuilder.Context {
         }
         // A tab stop left of the text end would push the trailing part onto a second line.
         let leadingWidth = title.size().width
-        if let trailing, !trailing.isEmpty {
-            title.append(NSAttributedString(string: "\t\(trailing)", attributes: muted))
+        if let trailing, trailing.length > 0 {
+            title.append(NSAttributedString(string: "\t", attributes: muted))
+            title.append(trailing)
         }
         let paragraph = NSMutableParagraphStyle()
         let tabLocation = max(column, leadingWidth + trailingGap)
@@ -279,31 +288,58 @@ extension MenuBuilder.Context {
         return item
     }
 
-    /// Down before warning; the glyph tells them apart, so there are no section titles.
+    /// Project, then device, then sensors, like the project submenus. Down comes before warning;
+    /// the glyph tells them apart, so there are no section titles.
     private func problemItems() -> [NSMenuItem] {
-        Self.groupedByDevice(model.problems.down + model.problems.warning).flatMap { group in
-            [deviceLine(group[0])] + group.map { sensorItem(row($0), showDevice: false) }
+        let problems = model.problems.down + model.problems.warning
+        return Self.grouped(problems, by: { devicesById[$0.deviceId]?.project.id }).flatMap { projectGroup in
+            let projectLine = devicesById[projectGroup[0].deviceId].map { [pathLine($0.project.displayName, emphasized: true)] }
+            return (projectLine ?? []) + Self.grouped(projectGroup, by: \.deviceId).flatMap { deviceGroup in
+                [deviceLine(deviceGroup[0])] + deviceGroup.map { sensorItem(row($0), showDevice: false) }
+            }
         }
     }
 
-    /// Keeps the problem order: a device appears where its first problem would.
-    private static func groupedByDevice(_ items: [ProblemItem]) -> [[ProblemItem]] {
-        var order: [Int] = []
-        var groups: [Int: [ProblemItem]] = [:]
+    /// Keeps the problem order: a group appears where its first problem would.
+    private static func grouped<Key: Hashable>(_ items: [ProblemItem], by key: (ProblemItem) -> Key) -> [[ProblemItem]] {
+        var order: [Key] = []
+        var groups: [Key: [ProblemItem]] = [:]
         for item in items {
-            if groups[item.deviceId] == nil { order.append(item.deviceId) }
-            groups[item.deviceId, default: []].append(item)
+            let itemKey = key(item)
+            if groups[itemKey] == nil { order.append(itemKey) }
+            groups[itemKey, default: []].append(item)
         }
         return order.compactMap { groups[$0] }
     }
 
+    /// Below a project line only the subgroups and the device remain; without a project the full group path.
     private func deviceLine(_ item: ProblemItem) -> NSMenuItem {
-        let path = ProjectBuilder.heading(path: item.groupPath, deviceName: item.deviceName)
-        // A plain item would start after the icon column; a view starts at the left edge.
-        let line = headerItem(DeviceLineView(path: path))
-        line.title = path
-        line.toolTip = path
+        let heading = devicesById[item.deviceId]?.device.heading
+            ?? ProjectBuilder.heading(path: item.groupPath, deviceName: item.deviceName)
+        return pathLine(heading, emphasized: false)
+    }
+
+    /// A plain item would start after the icon column; a view starts at the left edge.
+    private func pathLine(_ text: String, emphasized: Bool) -> NSMenuItem {
+        let line = headerItem(PathLineView(text: text, emphasized: emphasized))
+        line.title = text
+        line.toolTip = text
         return line
+    }
+
+    private func statusCounts(_ project: Project) -> NSAttributedString {
+        let counts = [(MenuGlyph.down, project.downCount), (MenuGlyph.warning, project.warningCount)]
+            .filter { $0.1 > 0 }
+        let result = NSMutableAttributedString()
+        for (index, (glyph, count)) in counts.enumerated() {
+            let attachment = NSTextAttachment()
+            attachment.image = glyph.image
+            attachment.bounds = CGRect(x: 0, y: -2, width: 13, height: 13)
+            result.append(MenuText.muted(index == 0 ? "" : "  "))
+            result.append(NSAttributedString(attachment: attachment))
+            result.append(MenuText.muted(" \(count)"))
+        }
+        return result
     }
 
     private func projectSection() -> [NSMenuItem] {
@@ -313,15 +349,11 @@ extension MenuBuilder.Context {
 
     private func projectItem(_ project: Project) -> NSMenuItem {
         let item = NSMenuItem(title: project.displayName, action: nil, keyEquivalent: "")
-        let counts = [
-            project.downCount > 0 ? "✕\(project.downCount)" : nil,
-            project.warningCount > 0 ? "▲\(project.warningCount)" : nil,
-        ].compactMap { $0 }.joined(separator: " ")
         let hasProbeSuffix = project.displayName != project.name
         item.attributedTitle = Self.rowTitle(
             MenuText.truncated(project.name, max: 40),
             secondary: hasProbeSuffix ? "· \(MenuText.truncated(project.probeName, max: 24))" : nil,
-            trailing: counts,
+            trailing: statusCounts(project),
             column: trailingColumn
         )
         item.image = MenuGlyph(status: project.worstStatus).image
