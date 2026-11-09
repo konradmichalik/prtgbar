@@ -36,13 +36,13 @@ struct SummaryHeaderView: View {
                     .help("Open PRTG")
                 }
                 HStack(spacing: 6) {
-                    summaryLine.font(.callout)
                     Spacer(minLength: 0)
                     if activity.isRefreshing {
                         ProgressView()
                             .controlSize(.small)
                             .accessibilityLabel("Refreshing")
                     }
+                    summaryLine.font(.callout)
                 }
             }
         }
