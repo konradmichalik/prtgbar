@@ -13,8 +13,9 @@ enum StatusItemState: Equatable {
         if model.errorMessage != nil { return .unreachable }
         if model.snoozedUntil != nil { return .snoozed(downCount: down) }
         if model.summary.down > 0 { return .down(down) }
-        if showWarningIndicator, model.summary.warning > 0 {
-            return .warningsOnly(showCount ? model.summary.warning : 0)
+        let warnings = model.summary.warning + model.summary.unusual
+        if showWarningIndicator, warnings > 0 {
+            return .warningsOnly(showCount ? warnings : 0)
         }
         return .allUp
     }

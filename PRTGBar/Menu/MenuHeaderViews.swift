@@ -62,7 +62,7 @@ struct SummaryHeaderView: View {
 /// "▲ 8 Warning · ✓ 26 Up" with status glyphs, shared by the main and the project header.
 enum StatusSummaryText {
     static func make(_ summary: StatusSummary) -> Text {
-        if summary.down == 0, summary.warning == 0 {
+        if summary.down == 0, summary.warning == 0, summary.unusual == 0, summary.paused == 0 {
             return glyphPart(.up, "All \(MenuText.count(summary.up, "sensor")) up")
         }
         let parts = MenuText.summaryParts(summary).map { glyphPart($0.glyph, $0.text) }
@@ -172,6 +172,8 @@ struct UptimeStripView: View {
         switch segment {
         case .up: Color(nsColor: MenuGlyph.up.color)
         case .warning: Color(nsColor: MenuGlyph.warning.color)
+        case .unusual: Color(nsColor: MenuGlyph.unusual.color)
+        case .paused: Color(nsColor: MenuGlyph.paused.color)
         case .down: Color(nsColor: MenuGlyph.down.color)
         case .noData: Color(nsColor: .quaternaryLabelColor)
         }

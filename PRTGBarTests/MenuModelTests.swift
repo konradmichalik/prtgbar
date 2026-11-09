@@ -25,17 +25,19 @@ final class MenuModelTests: XCTestCase {
     }
 
     func testSummaryLineOmitsZeroCounts() {
-        let full = StatusSummary(up: 1240, down: 2, warning: 3, paused: 4, unknown: 0)
-        XCTAssertEqual(MenuText.summaryLine(full), "2 Down · 3 Warning · 1,240 Up")
+        let full = StatusSummary(up: 1240, down: 2, warning: 3, paused: 4, unknown: 0, unusual: 1)
+        XCTAssertEqual(MenuText.summaryLine(full), "2 Down · 3 Warning · 1 Unusual · 4 Paused · 1,240 Up")
 
         let quiet = StatusSummary(up: 7, down: 0, warning: 0, paused: 0, unknown: 0)
         XCTAssertEqual(MenuText.summaryLine(quiet), "7 Up")
     }
 
     func testSummaryPartsCarryGlyphs() {
-        let parts = MenuText.summaryParts(StatusSummary(up: 5, down: 1, warning: 2, paused: 0, unknown: 0))
-        XCTAssertEqual(parts.map(\.glyph), [.down, .warning, .up])
-        XCTAssertEqual(parts.map(\.text), ["1 Down", "2 Warning", "5 Up"])
+        let parts = MenuText.summaryParts(StatusSummary(up: 5, down: 1, warning: 2, paused: 3, unknown: 0, unusual: 4))
+        XCTAssertEqual(parts.map(\.glyph), [.down, .warning, .unusual, .paused, .up])
+        XCTAssertEqual(parts.map(\.text), ["1 Down", "2 Warning", "4 Unusual", "3 Paused", "5 Up"])
+        XCTAssertEqual(MenuGlyph(status: .unusual), .unusual)
+        XCTAssertEqual(MenuGlyph(status: .paused), .paused)
     }
 
     func testCountPluralises() {
@@ -80,7 +82,7 @@ final class MenuModelTests: XCTestCase {
 
         let summary = makeModel(serverURL: "x", roots: [device]).summary
 
-        XCTAssertEqual(summary, StatusSummary(up: 1, down: 1, warning: 1, paused: 1, unknown: 0))
+        XCTAssertEqual(summary, StatusSummary(up: 1, down: 1, warning: 0, paused: 1, unknown: 0, unusual: 1))
     }
 
     func testMakeIsFastFor5000Sensors() {

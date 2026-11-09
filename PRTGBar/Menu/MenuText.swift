@@ -30,6 +30,8 @@ enum MenuText {
         var parts: [(glyph: MenuGlyph, text: String)] = []
         if s.down > 0 { parts.append((.down, "\(s.down) Down")) }
         if s.warning > 0 { parts.append((.warning, "\(s.warning) Warning")) }
+        if s.unusual > 0 { parts.append((.unusual, "\(s.unusual) Unusual")) }
+        if s.paused > 0 { parts.append((.paused, "\(grouped(s.paused)) Paused")) }
         parts.append((.up, "\(grouped(s.up)) Up"))
         return parts
     }

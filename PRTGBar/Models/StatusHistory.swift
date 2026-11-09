@@ -2,7 +2,7 @@ import Foundation
 import os
 
 enum SegmentState: Equatable {
-    case up, warning, down, noData
+    case up, paused, unusual, warning, down, noData
 }
 
 struct HistorySummary: Equatable {
@@ -26,29 +26,36 @@ final class StatusHistory {
         var hasUp = false
         var hasDown = false
         var hasWarning = false
+        var hasUnusual = false
+        var hasPaused = false
 
         init() {}
 
-        // Warning got its own bit later; older files simply have it unset.
+        // Bits beyond up and down were added later; older files simply have them unset.
         init(from decoder: Decoder) throws {
             let bits = try decoder.singleValueContainer().decode(Int.self)
             hasUp = bits & 1 != 0
             hasDown = bits & 2 != 0
             hasWarning = bits & 4 != 0
+            hasUnusual = bits & 8 != 0
+            hasPaused = bits & 16 != 0
         }
 
         func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
-            try container.encode((hasUp ? 1 : 0) | (hasDown ? 2 : 0) | (hasWarning ? 4 : 0))
+            let bits = (hasUp ? 1 : 0) | (hasDown ? 2 : 0) | (hasWarning ? 4 : 0)
+                | (hasUnusual ? 8 : 0) | (hasPaused ? 16 : 0)
+            try container.encode(bits)
         }
 
         mutating func add(_ status: SensorStatus) {
-            if status.isDownClass {
-                hasDown = true
-            } else if status.isWarningClass {
-                hasWarning = true
-            } else {
-                hasUp = true
+            switch status {
+            case .down, .partialdown: hasDown = true
+            case .warning: hasWarning = true
+            case .unusual: hasUnusual = true
+            case .paused: hasPaused = true
+            case .up: hasUp = true
+            case .unknown: break
             }
         }
 
@@ -57,12 +64,18 @@ final class StatusHistory {
             result.hasUp = hasUp || other.hasUp
             result.hasDown = hasDown || other.hasDown
             result.hasWarning = hasWarning || other.hasWarning
+            result.hasUnusual = hasUnusual || other.hasUnusual
+            result.hasPaused = hasPaused || other.hasPaused
             return result
         }
 
-        /// The worst state seen in the slot.
+        /// The worst state seen in the slot; paused only shows when nothing else was observed.
         var state: SegmentState {
-            hasDown ? .down : hasWarning ? .warning : hasUp ? .up : .noData
+            if hasDown { return .down }
+            if hasWarning { return .warning }
+            if hasUnusual { return .unusual }
+            if hasUp { return .up }
+            return hasPaused ? .paused : .noData
         }
     }
 
@@ -88,7 +101,7 @@ final class StatusHistory {
     /// Paused and unknown say nothing about availability, so they leave the slot without data.
     func record(_ states: [Int: SensorStatus], at date: Date) {
         let slot = Self.slotStart(of: date)
-        for (id, status) in states where status != .paused && status != .unknown {
+        for (id, status) in states where status != .unknown {
             slots[id, default: [:]][slot, default: SlotFlags()].add(status)
         }
         prune(now: date)
@@ -198,9 +211,10 @@ final class StatusHistory {
         }
     }
 
-    /// Share of observed segments that were up; warning counts as observed but not up.
+    /// Share of observed segments that were up. Warning and unusual count as observed but not up,
+    /// paused time counts neither way.
     private static func upRatio(of segments: [SegmentState]) -> Double? {
-        let observed = segments.filter { $0 != .noData }.count
+        let observed = segments.filter { $0 != .noData && $0 != .paused }.count
         let up = segments.filter { $0 == .up }.count
         return observed == 0 ? nil : Double(up) / Double(observed)
     }

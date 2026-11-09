@@ -6,7 +6,7 @@ enum GaugeLevel: Equatable {
     init(_ summary: StatusSummary) {
         if summary.down > 0 {
             self = .down
-        } else if summary.warning > 0 {
+        } else if summary.warning > 0 || summary.unusual > 0 {
             self = .warning
         } else {
             self = .ok

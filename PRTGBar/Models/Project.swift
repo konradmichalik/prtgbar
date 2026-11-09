@@ -27,6 +27,7 @@ struct Project: Identifiable, Equatable {
     let devices: [ProjectDevice]
     let downCount: Int
     let warningCount: Int
+    let unusualCount: Int
     let sensorCount: Int
     var displayName: String
     var worstStatus: SensorStatus
@@ -79,6 +80,7 @@ enum ProjectBuilder {
         var devices: [ProjectDevice] = []
         var downCount = 0
         var warningCount = 0
+        var unusualCount = 0
         var sensorCount = 0
         var worstStatus: SensorStatus = .up
     }
@@ -133,7 +135,8 @@ enum ProjectBuilder {
         bucket.devices.append(projectDevice)
         bucket.sensorCount += sensors.count
         bucket.downCount += problems.filter(\.status.isDownClass).count
-        bucket.warningCount += problems.filter(\.status.isWarningClass).count
+        bucket.warningCount += problems.filter { $0.status == .warning }.count
+        bucket.unusualCount += problems.filter { $0.status == .unusual }.count
         if let worst = problems.first, worst.status.severity < bucket.worstStatus.severity {
             bucket.worstStatus = worst.status
         }
@@ -162,6 +165,7 @@ enum ProjectBuilder {
             devices: devices,
             downCount: bucket.downCount,
             warningCount: bucket.warningCount,
+            unusualCount: bucket.unusualCount,
             sensorCount: bucket.sensorCount,
             displayName: bucket.name,
             worstStatus: bucket.worstStatus

@@ -71,8 +71,14 @@ struct StatusSummary: Codable, Equatable {
     let warning: Int
     let paused: Int
     let unknown: Int
+    /// Counted from sensors only; the API summary keeps unusual sensors in `unknown`.
+    var unusual = 0
 
-    var total: Int { up + down + warning + paused + unknown }
+    enum CodingKeys: String, CodingKey {
+        case up, down, warning, paused, unknown
+    }
+
+    var total: Int { up + down + warning + paused + unknown + unusual }
 }
 
 // MARK: - PRTG Object (API Response)

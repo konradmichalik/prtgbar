@@ -61,17 +61,20 @@ final class StatusHistoryTests: XCTestCase {
 
     func testWarningClassStatusesRecordWarning() {
         let history = StatusHistory(fileURL: nil)
-        history.record([1: .warning, 2: .unusual], at: ago(100))
+        history.record([1: .warning, 2: .unusual, 3: .paused], at: ago(100))
         XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .warning)
-        XCTAssertEqual(history.summary(for: 2, now: now).segments[47], .warning)
+        XCTAssertEqual(history.summary(for: 2, now: now).segments[47], .unusual)
+        XCTAssertEqual(history.summary(for: 3, now: now).segments[47], .paused)
     }
 
     func testSeverityWinsWithinSegment() {
         let history = StatusHistory(fileURL: nil)
-        history.record([1: .up, 2: .down], at: ago(100))
-        history.record([1: .warning, 2: .warning], at: ago(50))
+        history.record([1: .up, 2: .down, 3: .unusual, 4: .paused], at: ago(100))
+        history.record([1: .warning, 2: .warning, 3: .warning, 4: .up], at: ago(50))
         XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .warning, "warning beats up")
         XCTAssertEqual(history.summary(for: 2, now: now).segments[47], .down, "down beats warning")
+        XCTAssertEqual(history.summary(for: 3, now: now).segments[47], .warning, "warning beats unusual")
+        XCTAssertEqual(history.summary(for: 4, now: now).segments[47], .up, "up beats paused")
     }
 
     func testWarningIsNeitherUpNorOutage() {
@@ -83,16 +86,17 @@ final class StatusHistoryTests: XCTestCase {
         XCTAssertEqual(summary.outageCount, 0)
     }
 
-    func testPausedOrUnknownAllDayRecordsNothing() {
+    func testPausedAllDayHasNoUpRatio() {
         let history = StatusHistory(fileURL: nil)
         for poll in 0..<48 {
             history.record([1: .paused, 2: .unknown], at: ago(Double(poll) * slot))
         }
-        for id in [1, 2] {
-            let summary = history.summary(for: id, now: now)
-            XCTAssertEqual(Set(summary.segments), [.noData])
-            XCTAssertNil(summary.upRatio)
-        }
+        let paused = history.summary(for: 1, now: now)
+        XCTAssertEqual(Set(paused.segments).subtracting([.noData]), [.paused])
+        XCTAssertNil(paused.upRatio, "paused time counts neither for nor against up")
+        let unknown = history.summary(for: 2, now: now)
+        XCTAssertEqual(Set(unknown.segments), [.noData])
+        XCTAssertNil(unknown.upRatio)
     }
 
     func testRecordPrunesOlderThan24h() {

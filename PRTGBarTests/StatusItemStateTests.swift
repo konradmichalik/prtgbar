@@ -11,7 +11,8 @@ final class StatusItemStateTests: XCTestCase {
     func testWarningsOnlyWhenIndicatorEnabled() {
         let model = makeModel(roots: [device(statuses: [.up, .warning, .unusual])])
 
-        XCTAssertEqual(StatusItemState.make(model: model, showCount: true, showWarningIndicator: true), .warningsOnly(2))
+        XCTAssertEqual(StatusItemState.make(model: model, showCount: true, showWarningIndicator: true), .warningsOnly(2),
+                       "unusual counts towards the warning indicator")
         XCTAssertEqual(StatusItemState.make(model: model, showCount: false, showWarningIndicator: true), .warningsOnly(0))
         XCTAssertEqual(StatusItemState.make(model: model, showCount: true, showWarningIndicator: false), .allUp)
     }
@@ -79,6 +80,7 @@ final class StatusItemStateTests: XCTestCase {
         XCTAssertEqual(GaugeLevel(StatusSummary(up: 3, down: 0, warning: 0, paused: 0, unknown: 0)), .ok)
         XCTAssertEqual(GaugeLevel(StatusSummary(up: 3, down: 0, warning: 1, paused: 0, unknown: 0)), .warning)
         XCTAssertEqual(GaugeLevel(StatusSummary(up: 3, down: 1, warning: 1, paused: 0, unknown: 0)), .down)
+        XCTAssertEqual(GaugeLevel(StatusSummary(up: 3, down: 0, warning: 0, paused: 0, unknown: 0, unusual: 1)), .warning)
     }
 
     // MARK: - Helpers

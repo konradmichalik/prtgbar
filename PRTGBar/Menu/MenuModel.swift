@@ -55,7 +55,7 @@ struct MenuModel {
     }
 
     private static func summary(of roots: [TreeNode]) -> StatusSummary {
-        var counts = (up: 0, down: 0, warning: 0, paused: 0, unknown: 0)
+        var counts = (up: 0, down: 0, warning: 0, paused: 0, unknown: 0, unusual: 0)
         func visit(_ node: TreeNode) {
             if node.kind == .sensor {
                 switch node.status {
@@ -65,6 +65,8 @@ struct MenuModel {
                     guard !node.isAcknowledged else { return }
                     if node.status.isDownClass {
                         counts.down += 1
+                    } else if node.status == .unusual {
+                        counts.unusual += 1
                     } else {
                         counts.warning += 1
                     }
@@ -75,6 +77,6 @@ struct MenuModel {
         }
         roots.forEach(visit)
         return StatusSummary(up: counts.up, down: counts.down, warning: counts.warning,
-                             paused: counts.paused, unknown: counts.unknown)
+                             paused: counts.paused, unknown: counts.unknown, unusual: counts.unusual)
     }
 }

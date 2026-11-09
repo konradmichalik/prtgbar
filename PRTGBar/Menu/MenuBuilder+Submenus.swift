@@ -55,7 +55,8 @@ extension MenuBuilder.Context {
                 down: project.downCount,
                 warning: project.warningCount,
                 paused: project.devices.reduce(0) { $0 + $1.pausedCount },
-                unknown: 0
+                unknown: 0,
+                unusual: project.unusualCount
             ),
             detail: [project.probeName, devices, MenuText.count(project.sensorCount, "sensor")]
                 .filter { !$0.isEmpty }.joined(separator: " · ")

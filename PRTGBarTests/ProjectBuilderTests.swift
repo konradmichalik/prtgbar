@@ -86,6 +86,7 @@ final class ProjectBuilderTests: XCTestCase {
         XCTAssertEqual(projects[0].worstStatus, .down)
         XCTAssertEqual(projects[0].downCount, 1)
         XCTAssertEqual(projects[1].warningCount, 1)
+        XCTAssertEqual(projects[1].unusualCount, 0)
         XCTAssertEqual(projects[2].worstStatus, .up)
     }
 

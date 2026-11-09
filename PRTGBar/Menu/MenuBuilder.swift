@@ -14,52 +14,6 @@ protocol MenuActions: AnyObject {
     func snooze(until: Date?)
 }
 
-// MARK: - Glyphs
-
-enum MenuGlyph {
-    case down, warning, up, paused, acknowledged
-
-    init(status: SensorStatus) {
-        switch status {
-        case .down, .partialdown: self = .down
-        case .warning, .unusual, .unknown: self = .warning
-        case .paused: self = .paused
-        case .up: self = .up
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .down: "xmark.circle.fill"
-        case .warning: "exclamationmark.triangle.fill"
-        case .up: "checkmark.circle.fill"
-        case .paused: "pause.circle.fill"
-        case .acknowledged: "checkmark.circle"
-        }
-    }
-
-    var color: NSColor {
-        switch self {
-        case .down: .systemRed
-        case .warning: .systemOrange
-        case .up: .systemGreen
-        case .paused, .acknowledged: .secondaryLabelColor
-        }
-    }
-
-    /// A single palette colour would also fill the inner mark of `.fill` symbols and hide it.
-    private var paletteColors: [NSColor] {
-        symbolName.hasSuffix(".fill") ? [.white, color] : [color]
-    }
-
-    var image: NSImage? {
-        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: paletteColors))
-        image?.isTemplate = false
-        return image
-    }
-}
-
 // MARK: - Closure Item
 
 /// NSMenuItem targets are weak and need an Objective-C selector, so each item carries its own handler.
@@ -335,7 +289,11 @@ extension MenuBuilder.Context {
     }
 
     private func statusCounts(_ project: Project) -> NSAttributedString {
-        let counts = [(MenuGlyph.down, project.downCount), (MenuGlyph.warning, project.warningCount)]
+        let counts = [
+            (MenuGlyph.down, project.downCount),
+            (MenuGlyph.warning, project.warningCount),
+            (MenuGlyph.unusual, project.unusualCount),
+        ]
             .filter { $0.1 > 0 }
         let result = NSMutableAttributedString()
         for (index, (glyph, count)) in counts.enumerated() {
