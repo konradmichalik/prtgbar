@@ -173,14 +173,18 @@ extension MenuBuilder.Context {
             return [action("Set up PRTG…") { $0.openSettings() }, .separator()] + appItems()
         }
         let summary = SummaryHeaderView(host: model.serverHost, summary: model.summary, hasData: model.lastUpdated != nil)
-        return errorItems()
-            + [headerItem(summary)]
-            + sensorSection("DOWN", model.problems.down)
-            + sensorSection("WARNING", model.problems.warning)
-            + acknowledgedItems()
-            + projectSection()
-            + [.separator()] + prtgItems()
-            + [.separator(), snoozeItem()] + appItems()
+        var items: [NSMenuItem] = errorItems()
+        items.append(headerItem(summary))
+        items.append(contentsOf: sensorSection("DOWN", model.problems.down))
+        items.append(contentsOf: sensorSection("WARNING", model.problems.warning))
+        items.append(contentsOf: acknowledgedItems())
+        items.append(contentsOf: projectSection())
+        items.append(NSMenuItem.separator())
+        items.append(contentsOf: prtgItems())
+        items.append(NSMenuItem.separator())
+        items.append(snoozeItem())
+        items.append(contentsOf: appItems())
+        return items
     }
 
     func headerItem<V: View>(_ view: V) -> NSMenuItem {
