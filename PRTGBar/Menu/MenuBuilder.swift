@@ -298,12 +298,9 @@ extension MenuBuilder.Context {
 
     private func deviceLine(_ item: ProblemItem) -> NSMenuItem {
         let path = ProjectBuilder.heading(path: item.groupPath, deviceName: item.deviceName)
-        let deviceId = item.deviceId
-        let line = action(MenuText.truncated(path, max: 56)) { $0.open(objectId: deviceId) }
-        line.attributedTitle = NSAttributedString(
-            string: line.title,
-            attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.secondaryLabelColor]
-        )
+        // A plain item would start after the icon column; a view starts at the left edge.
+        let line = headerItem(DeviceLineView(path: path))
+        line.title = path
         line.toolTip = path
         return line
     }

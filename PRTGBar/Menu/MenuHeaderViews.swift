@@ -50,6 +50,23 @@ struct SummaryHeaderView: View {
     }
 }
 
+// MARK: - Device Line
+
+struct DeviceLineView: View {
+    let path: String
+
+    var body: some View {
+        Text(path)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 14)
+            .padding(.top, 4)
+            .padding(.bottom, 1)
+            .frame(width: MenuLayout.headerWidth, alignment: .leading)
+    }
+}
+
 // MARK: - Project
 
 struct ProjectHeaderView: View {

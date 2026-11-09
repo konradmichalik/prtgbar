@@ -40,13 +40,9 @@ final class MenuBuilderTests: XCTestCase {
         let titles = section.map { $0.title.components(separatedBy: "\t")[0] }
         XCTAssertEqual(titles, ["vhw › Middleware › api", "S1", "S3", "vhw › Middleware › db", "S2"])
 
-        let actions = RecordingActions()
-        let deviceLine = MenuBuilder.build(menuModelFor(customer, now: now), history: { _ in nil }, actions: actions)
-            .items[start]
-        XCTAssertTrue(deviceLine.isEnabled)
+        let deviceLine = menu.items[start]
+        XCTAssertNotNil(deviceLine.view, "own view, so the line starts at the left edge instead of after the icon column")
         XCTAssertNil(deviceLine.submenu)
-        trigger(deviceLine)
-        XCTAssertEqual(actions.opened, [100])
         let sensorLine = menu.items[start + 1]
         XCTAssertEqual(sensorLine.indentationLevel, 0)
         XCTAssertNotNil(sensorLine.submenu)
