@@ -5,6 +5,8 @@
 
 **PRTG Network Monitor in your macOS menu bar.**
 
+[Website](https://konradmichalik.github.io/prtgbar/) · [Releases](https://github.com/konradmichalik/prtgbar/releases)
+
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)](https://www.apple.com/macos/)
 [![Swift 6](https://img.shields.io/badge/Swift-6.0-orange?logo=swift)](https://swift.org)
 [![Xcode 16](https://img.shields.io/badge/Xcode-16-blue?logo=xcode)](https://developer.apple.com/xcode/)
