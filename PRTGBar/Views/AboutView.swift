@@ -13,7 +13,7 @@ struct AboutView: View {
 
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
                 .frame(height: 64)
 
             Text("PRTGBar")
