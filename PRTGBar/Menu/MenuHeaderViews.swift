@@ -171,6 +171,7 @@ struct UptimeStripView: View {
     private func color(for segment: SegmentState) -> Color {
         switch segment {
         case .up: Color(nsColor: MenuGlyph.up.color)
+        case .warning: Color(nsColor: MenuGlyph.warning.color)
         case .down: Color(nsColor: MenuGlyph.down.color)
         case .noData: Color(nsColor: .quaternaryLabelColor)
         }

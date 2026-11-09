@@ -59,10 +59,28 @@ final class StatusHistoryTests: XCTestCase {
         XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .down)
     }
 
-    func testNonDownStatusesCountAsUp() {
+    func testWarningClassStatusesRecordWarning() {
         let history = StatusHistory(fileURL: nil)
-        history.record([1: .warning], at: ago(100))
-        XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .up)
+        history.record([1: .warning, 2: .unusual], at: ago(100))
+        XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .warning)
+        XCTAssertEqual(history.summary(for: 2, now: now).segments[47], .warning)
+    }
+
+    func testSeverityWinsWithinSegment() {
+        let history = StatusHistory(fileURL: nil)
+        history.record([1: .up, 2: .down], at: ago(100))
+        history.record([1: .warning, 2: .warning], at: ago(50))
+        XCTAssertEqual(history.summary(for: 1, now: now).segments[47], .warning, "warning beats up")
+        XCTAssertEqual(history.summary(for: 2, now: now).segments[47], .down, "down beats warning")
+    }
+
+    func testWarningIsNeitherUpNorOutage() {
+        let history = StatusHistory(fileURL: nil)
+        history.record([1: .up], at: ago(1.5 * slot))
+        history.record([1: .warning], at: ago(10))
+        let summary = history.summary(for: 1, now: now)
+        XCTAssertEqual(summary.upRatio, 0.5)
+        XCTAssertEqual(summary.outageCount, 0)
     }
 
     func testPausedOrUnknownAllDayRecordsNothing() {
@@ -155,13 +173,14 @@ final class StatusHistoryTests: XCTestCase {
         let file = dir.appendingPathComponent("history.json")
 
         let first = StatusHistory(fileURL: file)
-        first.record([1: .down, 2: .up], at: ago(100))
+        first.record([1: .down, 2: .up, 3: .warning], at: ago(100))
         try first.save()
 
         let second = StatusHistory(fileURL: file)
         try second.load(now: now)
         XCTAssertEqual(second.summary(for: 1, now: now), first.summary(for: 1, now: now))
         XCTAssertEqual(second.summary(for: 2, now: now).segments[47], .up)
+        XCTAssertEqual(second.summary(for: 3, now: now).segments[47], .warning)
     }
 
     func testLoadMissingFileLeavesHistoryEmpty() throws {

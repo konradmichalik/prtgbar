@@ -2,7 +2,7 @@ import Foundation
 import os
 
 enum SegmentState: Equatable {
-    case up, down, noData
+    case up, warning, down, noData
 }
 
 struct HistorySummary: Equatable {
@@ -25,29 +25,44 @@ final class StatusHistory {
     private struct SlotFlags: Codable {
         var hasUp = false
         var hasDown = false
+        var hasWarning = false
 
         init() {}
 
+        // Warning got its own bit later; older files simply have it unset.
         init(from decoder: Decoder) throws {
             let bits = try decoder.singleValueContainer().decode(Int.self)
             hasUp = bits & 1 != 0
             hasDown = bits & 2 != 0
+            hasWarning = bits & 4 != 0
         }
 
         func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
-            try container.encode((hasUp ? 1 : 0) | (hasDown ? 2 : 0))
+            try container.encode((hasUp ? 1 : 0) | (hasDown ? 2 : 0) | (hasWarning ? 4 : 0))
         }
 
-        mutating func add(isDown: Bool) {
-            if isDown { hasDown = true } else { hasUp = true }
+        mutating func add(_ status: SensorStatus) {
+            if status.isDownClass {
+                hasDown = true
+            } else if status.isWarningClass {
+                hasWarning = true
+            } else {
+                hasUp = true
+            }
         }
 
         func merged(with other: SlotFlags) -> SlotFlags {
             var result = self
             result.hasUp = hasUp || other.hasUp
             result.hasDown = hasDown || other.hasDown
+            result.hasWarning = hasWarning || other.hasWarning
             return result
+        }
+
+        /// The worst state seen in the slot.
+        var state: SegmentState {
+            hasDown ? .down : hasWarning ? .warning : hasUp ? .up : .noData
         }
     }
 
@@ -74,15 +89,14 @@ final class StatusHistory {
     func record(_ states: [Int: SensorStatus], at date: Date) {
         let slot = Self.slotStart(of: date)
         for (id, status) in states where status != .paused && status != .unknown {
-            slots[id, default: [:]][slot, default: SlotFlags()].add(isDown: status.isDownClass)
+            slots[id, default: [:]][slot, default: SlotFlags()].add(status)
         }
         prune(now: date)
     }
 
     func summary(for sensorId: Int, now: Date) -> HistorySummary {
         let nowTime = now.timeIntervalSince1970
-        var hasUp = [Bool](repeating: false, count: Self.segmentCount)
-        var hasDown = [Bool](repeating: false, count: Self.segmentCount)
+        var merged = [SlotFlags](repeating: SlotFlags(), count: Self.segmentCount)
 
         for (slot, flags) in slots[sensorId] ?? [:] {
             let age = nowTime - TimeInterval(slot)
@@ -90,13 +104,10 @@ final class StatusHistory {
             // Segments are start-inclusive and end-exclusive, the newest one also includes `now`.
             let slotsAgo = max(1, Int((age / Self.segmentLength).rounded(.up)))
             let index = Self.segmentCount - slotsAgo
-            if flags.hasDown { hasDown[index] = true }
-            if flags.hasUp { hasUp[index] = true }
+            merged[index] = merged[index].merged(with: flags)
         }
 
-        let segments: [SegmentState] = (0..<Self.segmentCount).map { i in
-            hasDown[i] ? .down : (hasUp[i] ? .up : .noData)
-        }
+        let segments = merged.map(\.state)
         return HistorySummary(
             segments: segments,
             upRatio: Self.upRatio(of: segments),
@@ -187,10 +198,11 @@ final class StatusHistory {
         }
     }
 
+    /// Share of observed segments that were up; warning counts as observed but not up.
     private static func upRatio(of segments: [SegmentState]) -> Double? {
+        let observed = segments.filter { $0 != .noData }.count
         let up = segments.filter { $0 == .up }.count
-        let down = segments.filter { $0 == .down }.count
-        return up + down == 0 ? nil : Double(up) / Double(up + down)
+        return observed == 0 ? nil : Double(up) / Double(observed)
     }
 
     private static func outageCount(of segments: [SegmentState]) -> Int {
