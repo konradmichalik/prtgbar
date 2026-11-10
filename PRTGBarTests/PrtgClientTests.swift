@@ -232,4 +232,36 @@ final class PrtgClientTests: XCTestCase {
             return XCTFail("a single sensor reports its own error")
         }
     }
+
+    // MARK: - Error Body
+
+    func testErrorMessageFromXMLBody() {
+        let xml = "<?xml version=\"1.0\"?><prtg><version>24.1</version><error>Sorry, not allowed.</error></prtg>"
+        XCTAssertEqual(PrtgClient.errorMessage(from: Data(xml.utf8), token: "tok"), "Sorry, not allowed.")
+    }
+
+    func testErrorMessageFromJSONBody() {
+        let json = #"{"prtg-version":"24.1","errormessage":"Sorry, not allowed."}"#
+        XCTAssertEqual(PrtgClient.errorMessage(from: Data(json.utf8), token: "tok"), "Sorry, not allowed.")
+    }
+
+    func testErrorMessageMissingForUnknownBody() {
+        XCTAssertNil(PrtgClient.errorMessage(from: Data("<html><body>Bad Request</body></html>".utf8), token: "tok"))
+        XCTAssertNil(PrtgClient.errorMessage(from: Data(), token: "tok"))
+    }
+
+    func testErrorMessageHidesEchoedToken() {
+        let xml = "<prtg><error>Bad request /api/pause.htm?id=1&apitoken=secret123</error></prtg>"
+        XCTAssertEqual(
+            PrtgClient.errorMessage(from: Data(xml.utf8), token: "secret123"),
+            "Bad request /api/pause.htm?id=1&apitoken=…"
+        )
+    }
+
+    func testServerMessageDescriptionCarriesStatusAndText() {
+        XCTAssertEqual(
+            PrtgClientError.serverMessage(400, "Sorry, not allowed.").errorDescription,
+            "Server returned error 400: Sorry, not allowed."
+        )
+    }
 }

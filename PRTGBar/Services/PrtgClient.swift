@@ -4,6 +4,7 @@ enum PrtgClientError: LocalizedError {
     case invalidURL
     case unauthorized
     case serverError(Int)
+    case serverMessage(Int, String)
     case networkError(Error)
     case decodingError(Error)
     case readOnly
@@ -14,6 +15,7 @@ enum PrtgClientError: LocalizedError {
         case .invalidURL: "Invalid server URL"
         case .unauthorized: "Invalid API key or insufficient permissions"
         case .serverError(let code): "Server returned error \(code)"
+        case .serverMessage(let code, let message): "Server returned error \(code): \(message)"
         case .networkError(let error): "Network error: \(error.localizedDescription)"
         case .decodingError(let error): "Failed to parse response: \(error.localizedDescription)"
         case .readOnly: "This API key is read-only or lacks permission for this action."
@@ -360,7 +362,28 @@ enum PrtgClient {
         case 401, 403:
             throw PrtgClientError.unauthorized
         default:
+            if let message = errorMessage(from: data, token: token) {
+                throw PrtgClientError.serverMessage(httpResponse.statusCode, message)
+            }
             throw PrtgClientError.serverError(httpResponse.statusCode)
         }
+    }
+
+    /// PRTG explains rejected calls in the body, as `<error>` in XML or `errormessage` in JSON.
+    static func errorMessage(from data: Data, token: String) -> String? {
+        let raw: String?
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            raw = json["errormessage"] as? String
+        } else if let body = String(data: data, encoding: .utf8),
+                  let start = body.range(of: "<error>"),
+                  let end = body.range(of: "</error>", range: start.upperBound..<body.endIndex) {
+            raw = String(body[start.upperBound..<end.lowerBound])
+        } else {
+            raw = nil
+        }
+        guard var text = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        // An error page that echoes the request URL would otherwise show the API key in the menu.
+        if !token.isEmpty { text = text.replacingOccurrences(of: token, with: "…") }
+        return String(text.prefix(200))
     }
 }
