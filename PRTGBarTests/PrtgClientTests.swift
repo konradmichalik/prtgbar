@@ -14,6 +14,58 @@ final class PrtgClientTests: XCTestCase {
         XCTAssertEqual(TreeBuilder.buildTree(from: objects).first?.lastValue, "8 msec")
     }
 
+    // MARK: - Problem Since
+
+    private func ole(secondsAgo: Double) -> Double {
+        (Date().timeIntervalSince1970 - secondsAgo) / 86400.0 + 25569.0
+    }
+
+    private func decodeSensor(status: Int, extra: String) throws -> PrtgObject {
+        let json = #"{"sensors":[{"objid":1,"name":"HTTP","status_raw":"# + "\(status)" + #","parentid":100"# + extra + "}]}"
+        return try XCTUnwrap(PrtgClient.decodeTable(Data(json.utf8), kind: .sensor).first)
+    }
+
+    func testWarningStartsAfterLastUpNotLastDown() throws {
+        let object = try decodeSensor(
+            status: 4,
+            extra: #","lastdown_raw":\#(ole(secondsAgo: 335_000)),"lastup_raw":\#(ole(secondsAgo: 480))"#
+        )
+        let since = try XCTUnwrap(object.lastDown)
+        XCTAssertEqual(Date().timeIntervalSince(since), 480, accuracy: 5)
+    }
+
+    func testWarningRightAfterOutageStartsAtOutage() throws {
+        let object = try decodeSensor(
+            status: 4,
+            extra: #","lastdown_raw":\#(ole(secondsAgo: 600)),"lastup_raw":\#(ole(secondsAgo: 7_200))"#
+        )
+        let since = try XCTUnwrap(object.lastDown)
+        XCTAssertEqual(Date().timeIntervalSince(since), 600, accuracy: 5)
+    }
+
+    func testDownPrefersDowntimeSince() throws {
+        let object = try decodeSensor(
+            status: 5,
+            extra: #","downtimesince_raw":"120","lastdown_raw":\#(ole(secondsAgo: 3_600))"#
+        )
+        let since = try XCTUnwrap(object.lastDown)
+        XCTAssertEqual(Date().timeIntervalSince(since), 120, accuracy: 5)
+    }
+
+    func testWarningWithoutLastUpHasNoStart() throws {
+        let object = try decodeSensor(status: 4, extra: #","lastdown_raw":\#(ole(secondsAgo: 335_000))"#)
+        XCTAssertNil(object.lastDown)
+    }
+
+    func testDownStartsAtLastDown() throws {
+        let object = try decodeSensor(
+            status: 5,
+            extra: #","lastdown_raw":\#(ole(secondsAgo: 3_600)),"lastup_raw":\#(ole(secondsAgo: 3_900))"#
+        )
+        let since = try XCTUnwrap(object.lastDown)
+        XCTAssertEqual(Date().timeIntervalSince(since), 3_600, accuracy: 5)
+    }
+
     func testDecodePrtgObject() throws {
         let json = """
         {

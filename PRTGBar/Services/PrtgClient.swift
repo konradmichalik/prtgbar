@@ -63,6 +63,7 @@ private struct V1Row: Decodable {
     let pausedsensRaw: Int?
     let unusualsensRaw: Int?
     let lastdownRaw: Double?
+    let lastupRaw: Double?
     let downtimesinceRaw: Int?
     let lastvalue: String?
 
@@ -77,6 +78,7 @@ private struct V1Row: Decodable {
         case pausedsensRaw = "pausedsens_raw"
         case unusualsensRaw = "unusualsens_raw"
         case lastdownRaw = "lastdown_raw"
+        case lastupRaw = "lastup_raw"
         case downtimesinceRaw = "downtimesince_raw"
     }
 
@@ -95,24 +97,18 @@ private struct V1Row: Decodable {
         pausedsensRaw = try c.decodeIfPresent(Int.self, forKey: .pausedsensRaw)
         unusualsensRaw = try c.decodeIfPresent(Int.self, forKey: .unusualsensRaw)
         lastvalue = try? c.decodeIfPresent(String.self, forKey: .lastvalue)
-        // downtimesince_raw may be Int, String, or absent depending on sensor state
-        if let val = try? c.decodeIfPresent(Int.self, forKey: .downtimesinceRaw) {
-            downtimesinceRaw = val
-        } else if let str = try? c.decodeIfPresent(String.self, forKey: .downtimesinceRaw),
-                  let val = Int(str) {
-            downtimesinceRaw = val
-        } else {
-            downtimesinceRaw = nil
-        }
-        // lastdown_raw is OLE Automation date — may be Double, String, or absent
-        if let val = try? c.decodeIfPresent(Double.self, forKey: .lastdownRaw) {
-            lastdownRaw = val
-        } else if let str = try? c.decodeIfPresent(String.self, forKey: .lastdownRaw),
-                  let val = Double(str) {
-            lastdownRaw = val
-        } else {
-            lastdownRaw = nil
-        }
+        downtimesinceRaw = Self.decodeLenient(c, .downtimesinceRaw)
+        lastdownRaw = Self.decodeLenient(c, .lastdownRaw)
+        lastupRaw = Self.decodeLenient(c, .lastupRaw)
+    }
+
+    // PRTG sends these as a number, a string, or not at all, depending on sensor state
+    private static func decodeLenient<T: Decodable & LosslessStringConvertible>(
+        _ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys
+    ) -> T? {
+        if let val = try? c.decodeIfPresent(T.self, forKey: key) { return val }
+        if let str = try? c.decodeIfPresent(String.self, forKey: key) { return T(str) }
+        return nil
     }
 }
 
@@ -205,7 +201,7 @@ enum PrtgClient {
         let columns: String
         switch kind {
         case .sensor:
-            columns = "objid,name,status,message,parentid,tags,active,lastdown,downtimesince,lastvalue"
+            columns = "objid,name,status,message,parentid,tags,active,lastdown,lastup,downtimesince,lastvalue"
         default:
             columns = "objid,name,status,parentid,tags,active,upsens,downsens,warnsens,pausedsens,unusualsens"
         }
@@ -260,20 +256,7 @@ enum PrtgClient {
             nil
         }
 
-        // Prefer downtimesince_raw (seconds) from PRTG — most accurate.
-        // Fall back to lastdown_raw (OLE Automation date) if unavailable.
-        let lastDown: Date?
-        if kind == .sensor, SensorStatus.problemStatuses.contains(status) {
-            if let seconds = row.downtimesinceRaw, seconds > 0 {
-                lastDown = Date(timeIntervalSinceNow: -Double(seconds))
-            } else if let ole = row.lastdownRaw, ole > 25569.0 {
-                lastDown = Date(timeIntervalSince1970: (ole - 25569.0) * 86400.0)
-            } else {
-                lastDown = nil
-            }
-        } else {
-            lastDown = nil
-        }
+        let lastDown = kind == .sensor ? problemSince(row, status: status) : nil
 
         return PrtgObject(
             id: row.objid,
@@ -288,6 +271,22 @@ enum PrtgClient {
             lastDown: lastDown,
             lastValue: kind == .sensor ? row.lastvalue : nil
         )
+    }
+
+    /// A warning begins after whichever came last, the last OK scan or an outage it followed directly.
+    private static func problemSince(_ row: V1Row, status: SensorStatus) -> Date? {
+        if status.isDownClass {
+            if let seconds = row.downtimesinceRaw, seconds > 0 { return Date(timeIntervalSinceNow: -Double(seconds)) }
+            return oleDate(row.lastdownRaw)
+        }
+        guard status.isWarningClass, let lastUp = oleDate(row.lastupRaw) else { return nil }
+        if let lastDown = oleDate(row.lastdownRaw), lastDown > lastUp { return lastDown }
+        return lastUp
+    }
+
+    private static func oleDate(_ ole: Double?) -> Date? {
+        guard let ole, ole > 25569.0 else { return nil }
+        return Date(timeIntervalSince1970: (ole - 25569.0) * 86400.0)
     }
 
     private static func mapV1Status(_ raw: Int?) -> SensorStatus {
